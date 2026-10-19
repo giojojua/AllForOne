@@ -1,4 +1,4 @@
--- MinimalPvP: core (namespace, events, settings, pixel root, Blizzard hiding)
+-- AllForOne: core (namespace, events, settings, pixel root, Blizzard hiding)
 local ADDON, ns = ...
 ns.name = ADDON
 
@@ -53,7 +53,7 @@ ns:On("PLAYER_REGEN_ENABLED", function()
 end)
 
 function ns:Print(...)
-	DEFAULT_CHAT_FRAME:AddMessage("|cff69ccf0MinimalPvP|r: " .. strjoin(" ", tostringall(...)))
+	DEFAULT_CHAT_FRAME:AddMessage("|cff69ccf0AllForOne|r: " .. strjoin(" ", tostringall(...)))
 end
 
 ----------------------------------------------------------------------
@@ -82,8 +82,8 @@ end
 ----------------------------------------------------------------------
 ns.media = {
 	flat = "Interface\\Buttons\\WHITE8X8",
-	font = "Interface\\AddOns\\MinimalPvP\\Media\\BarlowCondensed-600.ttf",
-	fontBold = "Interface\\AddOns\\MinimalPvP\\Media\\BarlowCondensed-700.ttf",
+	font = "Interface\\AddOns\\AllForOne\\Media\\BarlowCondensed-600.ttf",
+	fontBold = "Interface\\AddOns\\AllForOne\\Media\\BarlowCondensed-700.ttf",
 	fallback = "Fonts\\ARIALN.TTF",
 }
 
@@ -138,7 +138,7 @@ end
 ----------------------------------------------------------------------
 -- Root frame: 1 unit = 1 pixel of a 1920x1080 screen (scaled to any size)
 ----------------------------------------------------------------------
-local root = CreateFrame("Frame", "MinimalPvPRoot", UIParent)
+local root = CreateFrame("Frame", "AllForOneRoot", UIParent)
 root:SetAllPoints(UIParent)
 root:SetFrameStrata("LOW")
 ns.root = root
@@ -189,8 +189,8 @@ end
 
 ns:On("ADDON_LOADED", function(_, name)
 	if name == ADDON then
-		MinimalPvPDB = CopyDefaults(ns.defaults, MinimalPvPDB or {})
-		ns.db = MinimalPvPDB
+		AllForOneDB = CopyDefaults(ns.defaults, AllForOneDB or {})
+		ns.db = AllForOneDB
 	elseif name == "Blizzard_ArenaUI" and ArenaEnemyFrames then
 		ns:Kill(ArenaEnemyFrames)
 	end
@@ -227,8 +227,9 @@ end
 ----------------------------------------------------------------------
 -- Slash commands
 ----------------------------------------------------------------------
-SLASH_MINIMALPVP1 = "/mpvp"
-SlashCmdList.MINIMALPVP = function(msg)
+SLASH_ALLFORONE1 = "/afo"
+SLASH_ALLFORONE2 = "/allforone"
+SlashCmdList.ALLFORONE = function(msg)
 	local cmd, arg = strsplit(" ", strlower(strtrim(msg or "")), 2)
 	if cmd == "test" then
 		ns:Send("TOGGLE_TEST")
@@ -252,11 +253,11 @@ SlashCmdList.MINIMALPVP = function(msg)
 		ns:Print(cmd, ns.db[cmd] and "on" or "off", "- type /reload to apply")
 	else
 		ns:Print("commands:")
-		ns:Print("/mpvp test - show every frame with sample data")
-		ns:Print("/mpvp scale 0.9 - resize the whole UI")
-		ns:Print("/mpvp colors - class-colored bars on/off")
-		ns:Print("/mpvp menu 0.4 - idle opacity of bags and menu (0-1)")
-		ns:Print("/mpvp font - bundled font on/off (off for Cyrillic/Asian names)")
-		ns:Print("/mpvp nameplates | actionbars | minimap | chat - turn a module on/off")
+		ns:Print("/afo test - show every frame with sample data")
+		ns:Print("/afo scale 0.9 - resize the whole UI")
+		ns:Print("/afo colors - class-colored bars on/off")
+		ns:Print("/afo menu 0.4 - idle opacity of bags and menu (0-1)")
+		ns:Print("/afo font - bundled font on/off (off for Cyrillic/Asian names)")
+		ns:Print("/afo nameplates | actionbars | minimap | chat - turn a module on/off")
 	end
 end

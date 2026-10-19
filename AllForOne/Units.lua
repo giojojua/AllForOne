@@ -1,4 +1,4 @@
--- MinimalPvP: unit frames
+-- AllForOne: unit frames
 -- Left: you + party (+pets). Right: arena 1-5 (+pets), mirrored.
 -- Center: target (cast, debuffs, buffs, combo points), target of target, focus, your cast bar.
 local _, ns = ...

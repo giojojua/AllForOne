@@ -1,4 +1,4 @@
--- MinimalPvP: building blocks (bars, icons, text, cast bars)
+-- AllForOne: building blocks (bars, icons, text, cast bars)
 local _, ns = ...
 local media, colors = ns.media, ns.colors
 local GetTime = GetTime

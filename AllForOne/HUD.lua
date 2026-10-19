@@ -1,4 +1,4 @@
--- MinimalPvP: minimap, bags + game menu, XP/rep bar, chat cleanup, arena timer + gates countdown
+-- AllForOne: minimap, bags + game menu, XP/rep bar, chat cleanup, arena timer + gates countdown
 local _, ns = ...
 local colors, media = ns.colors, ns.media
 
@@ -126,7 +126,7 @@ local function UpdateBags()
 end
 
 local function SetupMenu()
-	local f = CreateFrame("Frame", "MPvPMenu", ns.root)
+	local f = CreateFrame("Frame", "AFOMenu", ns.root)
 	f:SetSize(10, 60)
 	f:SetPoint("BOTTOMRIGHT", ns.root, "BOTTOMRIGHT", -24, 24)
 	menuFrame = f

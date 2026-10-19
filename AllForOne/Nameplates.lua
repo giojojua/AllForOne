@@ -1,4 +1,4 @@
--- MinimalPvP: nameplates for 3.3.5
+-- AllForOne: nameplates for 3.3.5
 -- 3.3.5 has no nameplate API: plates are unnamed children of WorldFrame.
 -- We hide Blizzard's art and draw our own bar on top, reading values from theirs.
 local _, ns = ...

@@ -1,4 +1,4 @@
--- MinimalPvP: swing timer
+-- AllForOne: swing timer
 -- Two thin bars right under your cast bar: main hand (top) and off hand (below).
 -- Hunters see Auto Shot and wand users see Shoot in the top bar.
 -- Shows only while you auto-attack.
