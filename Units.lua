@@ -36,6 +36,11 @@ function U.Faction(u)
 	end
 	return UnitFactionGroup(u)
 end
+function U.CreatureIcon(u)
+	local f = fake(u)
+	if f and f.creature then return ns.creatureIcons[f.creature] or ns.creatureFallback end
+	return ns:CreatureIcon(u)
+end
 function U.Dead(u) if fake(u) then return false end return UnitIsDeadOrGhost(u) end
 function U.Visible(u)
 	if fake(u) then return true end
@@ -166,6 +171,7 @@ end
 ----------------------------------------------------------------------
 -- Team / arena row
 -- Layout, left to right: class icon | health+power | trinket. Same on both sides,
+-- then underneath: pet (with its type icon), cooldowns, cast bar.
 -- so every frame has its class icon on the left. Side icons (enemy DR / team debuffs)
 -- sit on the side facing the screen center.
 ----------------------------------------------------------------------
@@ -297,6 +303,7 @@ function Row:UpdatePet()
 	local r, g, b = ns:ClassColor(U.Class(self.unit))
 	p.bar:SetStatusBarColor(r * 0.75, g * 0.75, b * 0.75)
 	p.name:SetText(U.Name(u) or "")
+	p.icon.tex:SetTexture(U.CreatureIcon(u))
 	p.hp:SetText(floor((cur or 0) / max * 100 + 0.5) .. "%")
 end
 
@@ -344,13 +351,13 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	f.trinket:Set(ns.trinketIcon)
 
 	f.castbar = ns:CreateCastbar(f, 248, 14, { iconSize = 0, fontSize = 12, lock = false })
-	f:Place(f.castbar, 0, 62, 248, 14)
+	f:Place(f.castbar, 0, 96, 248, 14)
 	f.castbar:SetUnit(unit)
 
 	f.cds = {}
 	for i = 1, 6 do
 		local icon = ns:CreateIcon(f, 30, 13)
-		f:Place(icon, (i - 1) * 33, 80, 30, 30)
+		f:Place(icon, (i - 1) * 33, 62, 30, 30)
 		f.cds[i] = icon
 	end
 
@@ -371,13 +378,17 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	-- Pet: smaller bar under the owner, on the class-icon side of the health bar
 	if petUnit then
 		local p = SecureUnit(f, petUnit, 140, 14, enemy and "focus" or nil)
-		f:Place(p, 44, 44, 140, 14)
+		f:Place(p, 62, 44, 140, 14)
 		p.bar = ns:CreateBar(p, 140, 14)
 		p.bar:SetAllPoints(p)
 		p.name = ns:CreateText(p.bar, 11, true, "LEFT")
 		p.name:SetPoint("LEFT", 6, 0)
 		p.hp = ns:CreateText(p.bar, 11, true, "RIGHT")
 		p.hp:SetPoint("RIGHT", -6, 0)
+		-- pet type icon (Beast, Demon, Undead, Elemental...) on the left of the pet bar
+		p.icon = ns:CreateIcon(p, 14)
+		p.icon:SetPoint("RIGHT", p, "LEFT", -4, 0)
+		p.icon:Show()
 		f.petFrame = p
 		p:HookScript("OnShow", function() f:UpdatePet() end)
 		byUnit[petUnit] = byUnit[petUnit] or {}
