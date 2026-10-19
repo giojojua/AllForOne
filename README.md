@@ -1,13 +1,13 @@
-# WoW 3.3.5 Addons
-
-## AllForOne
+# AllForOne
 
 A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 
 ### Install
-1. Copy the `AllForOne` folder into `World of Warcraft/Interface/AddOns/`. If you installed the earlier test version, delete the old `MinimalPvP` folder there first.
-2. Restart the game (or `/reload`) and enable **AllForOne** on the character screen.
-3. Type `/afo test` to see every frame with sample arena data.
+1. Download this repository (**Code → Download ZIP**) and unzip it.
+2. Put the unzipped folder into `World of Warcraft/Interface/AddOns/` and **rename it to `AllForOne`**. WoW only loads an addon whose folder name matches its `.toc` file (`AllForOne.toc`), so a folder called `OneForAll-main` won't load.
+3. If you installed an earlier test version, delete any old `MinimalPvP` folder there.
+4. Restart the game (or `/reload`) and enable **AllForOne** on the character screen.
+5. Type `/afo test` to see every frame with sample arena data.
 
 ### What's on screen
 - **Left:** you, then your party, each with PvP trinket, health/power, class icon, pet bar, cast bar, key cooldowns, and dispellable / CC debuffs.
@@ -38,4 +38,4 @@ Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mous
 - 3.3.5 has no nameplate API, so enemy debuffs on nameplates come from the combat log: exact when the enemy is your target/focus/arena unit, estimated otherwise.
 - Enemy spec is detected from the spells they cast.
 - The arena gates countdown reads the English system messages.
-- Font: Barlow Condensed (SIL Open Font License, see `AllForOne/Media/OFL.txt`).
+- Font: Barlow Condensed (SIL Open Font License, see `Media/OFL.txt`).
