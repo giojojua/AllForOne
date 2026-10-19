@@ -263,13 +263,23 @@ local function UpdatePlate(plate, d)
 		d.castbar:Hide()
 	end
 
-	-- combo points under your target's plate
+	-- combo points under your target's plate: 5 red segments as wide as the health bar
 	local points = isTarget and GetComboPoints("player", "target") or 0
-	local below = d.castbar:IsShown() and d.castbar or d.hp
+	local gap = 2
+	local pipW = (w - 4 * gap) / 5
+	d.castbar:ClearAllPoints()
+	if points > 0 then
+		d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -(2 + 5 + 3))
+		d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -(2 + 5 + 3))
+	else
+		d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -3)
+		d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -3)
+	end
 	for i, pip in ipairs(d.pips) do
 		if points > 0 then
+			pip:SetSize(pipW, 5)
 			pip:ClearAllPoints()
-			pip:SetPoint("TOP", below, "BOTTOM", (i - 3) * 17, -3)
+			pip:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", (i - 1) * (pipW + gap), -2)
 			if i <= points then
 				pip.fill:SetTexture(colors.combo[1], colors.combo[2], colors.combo[3], 1)
 			else
