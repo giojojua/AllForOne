@@ -378,7 +378,8 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	-- Pet: smaller bar under the owner, on the class-icon side of the health bar
 	if petUnit then
 		local p = SecureUnit(f, petUnit, 140, 14, enemy and "focus" or nil)
-		f:Place(p, 62, 44, 140, 14)
+		-- pet bar starts where the owner's health bar starts; its icon sits right-aligned under the class icon
+		f:Place(p, 44, 44, 140, 14)
 		p.bar = ns:CreateBar(p, 140, 14)
 		p.bar:SetAllPoints(p)
 		p.name = ns:CreateText(p.bar, 11, true, "LEFT")
