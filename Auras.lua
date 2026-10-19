@@ -48,6 +48,7 @@ local buffHolder
 -- so the first row's top edge lines up exactly with the minimap's top edge.
 local BUFF_SIZE, DEBUFF_SIZE, GAP_X, PER_ROW = 30, 36, 6, 8
 local TIMER_H = 18 -- room for the countdown under each icon
+local DEBUFF_GAP = 12 -- extra space between the last buff row and the debuff row
 
 local function LayoutAuras()
 	if not buffHolder or not BuffFrame then return end
@@ -67,8 +68,9 @@ local function LayoutAuras()
 		local b = _G["BuffButton" .. i]
 		if b and b:IsShown() then Place(b, BUFF_SIZE) end
 	end
-	-- debuffs start on their own row, a little bigger
+	-- debuffs start on their own row, a little bigger, with some space above them
 	if col > 0 then col, y = 0, y + rowH end
+	if y > 0 then y = y + DEBUFF_GAP end
 	rowH = DEBUFF_SIZE + TIMER_H
 	for i = 1, DEBUFF_MAX_DISPLAY or 8 do
 		local b = _G["DebuffButton" .. i]
