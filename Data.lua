@@ -346,3 +346,27 @@ ns.trinketIcon = ns.trinketIcons.Alliance
 function ns:TrinketIcon(faction)
 	return ns.trinketIcons[faction or ""] or ns.trinketIcon
 end
+
+----------------------------------------------------------------------
+-- Icons for non-players, by creature type (UnitCreatureType); skull when unknown
+----------------------------------------------------------------------
+ns.creatureIcons = {
+	Beast = "Interface\\Icons\\Ability_Hunter_Pet_Wolf",
+	Humanoid = "Interface\\Icons\\INV_Misc_Head_Human_01",
+	Undead = "Interface\\Icons\\Spell_Shadow_RaiseDead",
+	Demon = "Interface\\Icons\\Spell_Shadow_SummonFelHunter",
+	Elemental = "Interface\\Icons\\Spell_Frost_SummonWaterElemental",
+	Dragonkin = "Interface\\Icons\\INV_Misc_Head_Dragon_01",
+	Mechanical = "Interface\\Icons\\INV_Gizmo_02",
+	Giant = "Interface\\Icons\\Ability_Racial_Avatar",
+	Totem = "Interface\\Icons\\Spell_Nature_StoneClawTotem",
+	Critter = "Interface\\Icons\\Ability_Hunter_Pet_Rat",
+	["Non-combat Pet"] = "Interface\\Icons\\INV_Box_PetCarrier_01",
+	["Gas Cloud"] = "Interface\\Icons\\Spell_Nature_Cyclone",
+}
+ns.creatureFallback = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01"
+
+function ns:CreatureIcon(unit)
+	local kind = unit and UnitCreatureType(unit)
+	return (kind and ns.creatureIcons[kind]) or ns.creatureFallback
+end
