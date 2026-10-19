@@ -11,6 +11,7 @@ Widgets.lua
 Trackers.lua
 Units.lua
 Auras.lua
+Swing.lua
 Nameplates.lua
 ActionBars.lua
 HUD.lua
