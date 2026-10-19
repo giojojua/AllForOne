@@ -1,4 +1,4 @@
--- MinimalPvP: action bars
+-- AllForOne: action bars
 -- Reuses Blizzard's own buttons (your keybinds and macros keep working), moved and restyled:
 --   3 rows bottom-center: main bar, bottom-left bar (Shift row), bottom-right bar (Ctrl row)
 --   2 columns bottom-right above the bags: right bar (inner), right bar 2 (outer)
@@ -32,8 +32,8 @@ local function Shorten(text)
 end
 
 local function SkinButton(b)
-	if not b or b.mpvpSkinned then return end
-	b.mpvpSkinned = true
+	if not b or b.afoSkinned then return end
+	b.afoSkinned = true
 	local name = b:GetName()
 	local icon = _G[name .. "Icon"]
 	if icon then
@@ -101,27 +101,27 @@ cdTicker:SetScript("OnUpdate", function(_, elapsed)
 		local left = ends - now
 		if left <= 0 or not cd:IsVisible() then
 			if left <= 0 then active[cd] = nil end
-			cd.mpvpText:SetText("")
+			cd.afoText:SetText("")
 		else
-			cd.mpvpText:SetText(ns:FormatTime(left))
+			cd.afoText:SetText(ns:FormatTime(left))
 		end
 	end
 end)
 
 local function OnCooldownSet(cd, start, duration, enable)
 	if not cd or cd.noCooldownCount then return end
-	if not cd.mpvpText then
+	if not cd.afoText then
 		local overlay = CreateFrame("Frame", nil, cd)
 		overlay:SetAllPoints(cd)
 		overlay:SetFrameLevel(cd:GetFrameLevel() + 2)
-		cd.mpvpText = ns:CreateText(overlay, 15, true, "CENTER")
-		cd.mpvpText:SetPoint("CENTER", 0, 0)
+		cd.afoText = ns:CreateText(overlay, 15, true, "CENTER")
+		cd.afoText:SetPoint("CENTER", 0, 0)
 	end
 	if enable == 1 and duration and duration > 2 and start > 0 then
 		active[cd] = start + duration
 	else
 		active[cd] = nil
-		cd.mpvpText:SetText("")
+		cd.afoText:SetText("")
 	end
 end
 
@@ -170,7 +170,7 @@ local function AnchorPetBar()
 	local first = PetActionButton1
 	if not first then return end
 	first:ClearAllPoints()
-	first:SetPoint("BOTTOMLEFT", holders.MPvPPetBar, "BOTTOMLEFT", 0, 0)
+	first:SetPoint("BOTTOMLEFT", holders.AFOPetBar, "BOTTOMLEFT", 0, 0)
 	for i = 1, 10 do
 		local b = _G["PetActionButton" .. i]
 		if b then
@@ -185,23 +185,23 @@ end
 
 local function Reanchor()
 	ns:SafeCall(function()
-		AnchorSmallBar("ShapeshiftButton", 10, holders.MPvPStanceBar, GetNumShapeshiftForms())
-		AnchorSmallBar("PossessButton", 2, holders.MPvPStanceBar, 2)
+		AnchorSmallBar("ShapeshiftButton", 10, holders.AFOStanceBar, GetNumShapeshiftForms())
+		AnchorSmallBar("PossessButton", 2, holders.AFOStanceBar, 2)
 		AnchorPetBar()
 	end)
 end
 
 local function Build()
 	-- three middle rows; bottom row ends 30px above the screen edge (XP bar goes under)
-	local main = Holder("MPvPMainBar", 12 * STEP - GAP, BTN, "BOTTOM", 0, 108)
-	local bar2 = Holder("MPvPBar2", 12 * STEP - GAP, BTN, "BOTTOM", 0, 69)
-	local bar3 = Holder("MPvPBar3", 12 * STEP - GAP, BTN, "BOTTOM", 0, 30)
+	local main = Holder("AFOMainBar", 12 * STEP - GAP, BTN, "BOTTOM", 0, 108)
+	local bar2 = Holder("AFOBar2", 12 * STEP - GAP, BTN, "BOTTOM", 0, 69)
+	local bar3 = Holder("AFOBar3", 12 * STEP - GAP, BTN, "BOTTOM", 0, 30)
 	-- two columns bottom-right, above the bags
-	local right1 = Holder("MPvPRight1", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24 - STEP, 96)
-	local right2 = Holder("MPvPRight2", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24, 96)
+	local right1 = Holder("AFORight1", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24 - STEP, 96)
+	local right2 = Holder("AFORight2", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24, 96)
 	-- stance (left) and pet (right) bars, level with the main row
-	local stance = Holder("MPvPStanceBar", 10 * 33, 30, "BOTTOM", -(12 * STEP) / 2 - 12 - 165, 108)
-	local pet = Holder("MPvPPetBar", 10 * 33, 30, "BOTTOM", (12 * STEP) / 2 + 12 + 165, 108)
+	local stance = Holder("AFOStanceBar", 10 * 33, 30, "BOTTOM", -(12 * STEP) / 2 - 12 - 165, 108)
+	local pet = Holder("AFOPetBar", 10 * 33, 30, "BOTTOM", (12 * STEP) / 2 + 12 + 165, 108)
 
 	-- make sure all four extra bars are turned on
 	SHOW_MULTI_ACTIONBAR_1, SHOW_MULTI_ACTIONBAR_2, SHOW_MULTI_ACTIONBAR_3, SHOW_MULTI_ACTIONBAR_4 = "1", "1", "1", "1"

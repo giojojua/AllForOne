@@ -1,4 +1,4 @@
--- MinimalPvP: /mpvp test — fills every frame with sample arena data (out of combat only)
+-- AllForOne: /afo test — fills every frame with sample arena data (out of combat only)
 local _, ns = ...
 local GetTime = GetTime
 
@@ -85,7 +85,7 @@ local function Start()
 	})
 	ns:ShowLoC(Icon(118), "incap", 8, now + 6)
 	ns:ShowArenaSample(true)
-	ns:Print("test mode on - type /mpvp test again to turn it off")
+	ns:Print("test mode on - type /afo test again to turn it off")
 end
 
 local function Stop()

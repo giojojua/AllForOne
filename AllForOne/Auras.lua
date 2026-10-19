@@ -1,4 +1,4 @@
--- MinimalPvP: your buffs/debuffs (by the minimap), loss-of-control alert, proc alerts
+-- AllForOne: your buffs/debuffs (by the minimap), loss-of-control alert, proc alerts
 local _, ns = ...
 local colors, media = ns.colors, ns.media
 local GetTime = GetTime

@@ -1,4 +1,4 @@
--- MinimalPvP: spell data for WotLK 3.3.5
+-- AllForOne: spell data for WotLK 3.3.5
 -- Spells are listed by one spell ID and matched by localized NAME at login,
 -- so every rank of a spell is covered and the addon works on any client language.
 local _, ns = ...

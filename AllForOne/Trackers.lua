@@ -1,4 +1,4 @@
--- MinimalPvP: combat-log trackers (trinkets, cooldowns, DR, specs, auras by GUID)
+-- AllForOne: combat-log trackers (trinkets, cooldowns, DR, specs, auras by GUID)
 local _, ns = ...
 local GetTime, UnitGUID, band = GetTime, UnitGUID, bit.band
 local PLAYER_FLAG = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
