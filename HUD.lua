@@ -310,7 +310,7 @@ end
 local function SetupArena()
 	status = CreateFrame("Frame", nil, ns.root)
 	status:SetSize(300, 30)
-	ns:Mover("arenastatus", "ARENA TIMER", status, "TOP", "TOP", 0, -35)
+	ns:Mover("arenastatus", "ARENA TIMER", status, "TOP", "TOP", 0, -45)
 	ns:Skin(status)
 	status.fill:SetTexture(0.03, 0.035, 0.043, 0.85)
 	status.map = ns:CreateText(status, 15, true, "LEFT")
