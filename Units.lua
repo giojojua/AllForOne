@@ -27,6 +27,15 @@ function U.Power(u)
 	if f then return f.pw, 100, f.ptype end
 	return UnitPower(u), UnitPowerMax(u), UnitPowerType(u)
 end
+function U.Faction(u)
+	local f = fake(u)
+	if f then
+		local mine = UnitFactionGroup("player")
+		if f.enemy then return mine == "Horde" and "Alliance" or "Horde" end
+		return mine
+	end
+	return UnitFactionGroup(u)
+end
 function U.Dead(u) if fake(u) then return false end return UnitIsDeadOrGhost(u) end
 function U.Visible(u)
 	if fake(u) then return true end
@@ -207,10 +216,11 @@ end
 function Row:UpdateTrinket()
 	local guid = U.GUID(self.unit)
 	local used = guid and ns.trinkets[guid]
+	local icon = ns:TrinketIcon(U.Faction(self.unit))
 	if used and used + ns.trinketCooldown > GetTime() then
-		self.trinket:Set(ns.trinketIcon, nil, ns.trinketCooldown, used + ns.trinketCooldown, true)
+		self.trinket:Set(icon, nil, ns.trinketCooldown, used + ns.trinketCooldown, true)
 	else
-		self.trinket:Set(ns.trinketIcon)
+		self.trinket:Set(icon)
 	end
 end
 

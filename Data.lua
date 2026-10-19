@@ -323,6 +323,16 @@ ns:Listen("LOGIN", function()
 		local name = Info(id)
 		if name then ns.Trinket[name] = true end
 	end
-	local _, icon = Info(42292)
-	ns.trinketIcon = icon or "Interface\\Icons\\INV_Jewelry_TrinketPVP_01"
 end)
+
+-- The PvP trinket *spell* has a dispel-style icon in 3.3.5, so show the actual item:
+-- Medallion of the Alliance / Medallion of the Horde, by the player's faction.
+ns.trinketIcons = {
+	Alliance = "Interface\\Icons\\INV_Jewelry_TrinketPVP_01",
+	Horde = "Interface\\Icons\\INV_Jewelry_TrinketPVP_02",
+}
+ns.trinketIcon = ns.trinketIcons.Alliance
+
+function ns:TrinketIcon(faction)
+	return ns.trinketIcons[faction or ""] or ns.trinketIcon
+end
