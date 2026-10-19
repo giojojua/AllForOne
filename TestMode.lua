@@ -21,12 +21,12 @@ local function Start()
 	local _, myClass = UnitClass("player")
 	ns.fake = {
 		player = { name = UnitName("player"), class = myClass, hp = 72, pw = 64, ptype = UnitPowerType("player") },
-		pet = { name = "Water Elemental", class = myClass, hp = 90 },
+		pet = { name = "Water Elemental", class = myClass, hp = 90, creature = "Elemental" },
 		party1 = { name = "Rogue", class = "ROGUE", hp = 88, pw = 70, ptype = 3 },
 		party2 = { name = "Priest", class = "PRIEST", hp = 64, pw = 58, ptype = 0 },
 		arena1 = { enemy = true, name = "Warrior", class = "WARRIOR", hp = 41, pw = 55, ptype = 1 },
 		arena2 = { enemy = true, name = "Death Knight", class = "DEATHKNIGHT", hp = 77, pw = 30, ptype = 6 },
-		arenapet2 = { name = "Ghoul", class = "DEATHKNIGHT", hp = 64 },
+		arenapet2 = { name = "Ghoul", class = "DEATHKNIGHT", hp = 64, creature = "Undead" },
 		arena3 = { enemy = true, name = "Paladin", class = "PALADIN", hp = 58, pw = 81, ptype = 0 },
 		target = { name = "Paladin", class = "PALADIN", hp = 58, pw = 81, ptype = 0 },
 		targettarget = { name = "Rogue", class = "ROGUE", hp = 88 },
