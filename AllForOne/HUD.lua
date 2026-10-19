@@ -83,16 +83,17 @@ end)
 ----------------------------------------------------------------------
 -- Bags (top row) + game menu (bottom row), bottom-right, faded until hovered
 ----------------------------------------------------------------------
+-- { tooltip name, binding, icon, action } — icons are stock 3.3.5 textures
 local menuItems = {
-	{ "CHAR", "TOGGLECHARACTER0", function() ToggleCharacter("PaperDollFrame") end },
-	{ "SPELLS", "TOGGLESPELLBOOK", function() ToggleSpellBook(BOOKTYPE_SPELL) end },
-	{ "TALENTS", "TOGGLETALENTS", function() ToggleTalentFrame() end },
-	{ "ACH", "TOGGLEACHIEVEMENT", function() ToggleAchievementFrame() end },
-	{ "QUESTS", "TOGGLEQUESTLOG", function() ToggleFrame(QuestLogFrame) end },
-	{ "SOCIAL", "TOGGLESOCIAL", function() ToggleFriendsFrame() end },
-	{ "PVP", "TOGGLECHARACTER4", function() TogglePVPFrame() end },
-	{ "LFD", "TOGGLELFGPARENT", function() ToggleLFDParentFrame() end },
-	{ "MENU", nil, function()
+	{ "Character", "TOGGLECHARACTER0", "Interface\\Icons\\INV_Chest_Plate04", function() ToggleCharacter("PaperDollFrame") end },
+	{ "Spellbook", "TOGGLESPELLBOOK", "Interface\\Icons\\INV_Misc_Book_09", function() ToggleSpellBook(BOOKTYPE_SPELL) end },
+	{ "Talents", "TOGGLETALENTS", "Interface\\Icons\\Ability_Marksmanship", function() ToggleTalentFrame() end },
+	{ "Achievements", "TOGGLEACHIEVEMENT", "Interface\\Icons\\Achievement_Level_80", function() ToggleAchievementFrame() end },
+	{ "Quest log", "TOGGLEQUESTLOG", "Interface\\Icons\\INV_Misc_Note_01", function() ToggleFrame(QuestLogFrame) end },
+	{ "Social", "TOGGLESOCIAL", "Interface\\Icons\\INV_Misc_GroupLooking", function() ToggleFriendsFrame() end },
+	{ "PvP", "TOGGLECHARACTER4", "Interface\\Icons\\INV_BannerPVP_02", function() TogglePVPFrame() end },
+	{ "Dungeon finder", "TOGGLELFGPARENT", "Interface\\Icons\\INV_Misc_GroupNeedMore", function() ToggleLFDParentFrame() end },
+	{ "Game menu", nil, "Interface\\Icons\\INV_Misc_Gear_01", function()
 		if GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) else ShowUIPanel(GameMenuFrame) end
 	end },
 }
@@ -133,30 +134,30 @@ local function SetupMenu()
 	f:SetSize(10, 60)
 	menuFrame = f
 
-	-- bottom row: game menu text buttons
-	local x = 0
-	local buttons = {}
+	-- bottom row: game menu as small square icons (name + key in the tooltip)
+	local SIZE, GAP = 28, 3
 	for i = #menuItems, 1, -1 do
 		local item = menuItems[i]
 		local b = CreateFrame("Button", nil, f)
-		b:SetHeight(26)
-		ns:Skin(b)
-		local label = ns:CreateText(b, 12, true, "LEFT")
-		label:SetText(item[1])
-		local key = ns:CreateText(b, 12, true, "LEFT")
-		key:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-		key:SetText(KeyLabel(item[2]))
-		label:SetPoint("LEFT", 8, 0)
-		key:SetPoint("LEFT", label, "RIGHT", 4, 0)
-		local w = label:GetStringWidth() + key:GetStringWidth() + 20
-		b:SetWidth(w)
-		b:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -x, 0)
-		x = x + w + 3
-		b:SetScript("OnClick", item[3])
-		b:SetScript("OnEnter", function() label:SetTextColor(colors.kick[1], colors.kick[2], colors.kick[3]) end)
-		b:SetScript("OnLeave", function() label:SetTextColor(1, 1, 1) end)
-		buttons[#buttons + 1] = b
+		b:SetSize(SIZE, SIZE)
+		b:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -((#menuItems - i) * (SIZE + GAP)), 0)
+		b.icon = ns:CreateIcon(b, SIZE)
+		b.icon:SetAllPoints(b)
+		b.icon:Set(item[3])
+		b:SetScript("OnClick", item[4])
+		b:SetScript("OnEnter", function(self)
+			self.icon:SetBorder(colors.kick[1], colors.kick[2], colors.kick[3])
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			local key = KeyLabel(item[2])
+			GameTooltip:SetText(item[1] .. (key ~= "" and ("  |cff8b8f96" .. key .. "|r") or ""))
+			GameTooltip:Show()
+		end)
+		b:SetScript("OnLeave", function(self)
+			self.icon:SetBorder()
+			GameTooltip:Hide()
+		end)
 	end
+	local x = #menuItems * (SIZE + GAP) - GAP
 	f:SetWidth(x)
 	ns:Mover("menu", "BAGS + MENU", f, "BOTTOMRIGHT", "BOTTOMRIGHT", -24, 24)
 
