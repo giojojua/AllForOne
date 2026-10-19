@@ -76,18 +76,29 @@ local function LayoutAuras()
 	end
 end
 
+-- Blizzard puts BuffFrame back at its default spot (13px from the top, 205px from the
+-- right) whenever it re-arranges the screen. Every time it does, we put it back.
+local placing = false
+
 local function PlaceBuffFrame()
-	if not buffHolder then return end
-	ns:SafeCall(function()
-		local scale = buffHolder:GetEffectiveScale() / UIParent:GetEffectiveScale()
-		for _, f in ipairs({ BuffFrame, TemporaryEnchantFrame }) do
-			if f then
-				f:SetScale(scale)
-				f:ClearAllPoints()
-				f:SetPoint("TOPRIGHT", buffHolder, "TOPRIGHT", 0, 0)
-			end
+	if not buffHolder or placing then return end
+	placing = true
+	local scale = buffHolder:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	for _, f in ipairs({ BuffFrame, TemporaryEnchantFrame }) do
+		if f then
+			f:SetScale(scale)
+			f:ClearAllPoints()
+			f:SetPoint("TOPRIGHT", buffHolder, "TOPRIGHT", 0, 0)
 		end
-	end)
+	end
+	placing = false
+end
+
+local function KeepBuffFramePlaced()
+	for _, f in ipairs({ BuffFrame, TemporaryEnchantFrame }) do
+		if f then hooksecurefunc(f, "SetPoint", PlaceBuffFrame) end
+	end
+	if UIParent_ManageFramePositions then hooksecurefunc("UIParent_ManageFramePositions", PlaceBuffFrame) end
 end
 
 ns:Listen("LOGIN", function()
@@ -142,6 +153,7 @@ ns:Listen("LOGIN", function()
 	buffHolder:SetSize(PER_ROW * (BUFF_SIZE + GAP_X) - GAP_X, 168)
 	ns:Mover("buffs", "BUFFS / DEBUFFS", buffHolder, "TOPRIGHT", "TOPRIGHT", -206, -24)
 	PlaceBuffFrame()
+	KeepBuffFramePlaced()
 	LayoutAuras()
 end)
 ns:Listen("MINIMAP_PLACED", PlaceBuffFrame)
