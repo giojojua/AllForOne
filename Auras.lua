@@ -17,21 +17,14 @@ local function SkinAura(button, isDebuff)
 	if icon then
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		icon:SetAllPoints(button)
-		icon:SetDrawLayer("ARTWORK") -- above our outline/border, which share its old layer
 	end
-	local outline = button:CreateTexture(nil, "BACKGROUND")
-	outline:SetTexture(0, 0, 0, 1)
-	outline:SetPoint("TOPLEFT", -1, 1)
-	outline:SetPoint("BOTTOMRIGHT", 1, -1)
+	-- outline + dispel-colored ring sit in a frame BEHIND the button, never over the icon
+	button.afoBack = ns:Backing(button)
 	local border = _G[name .. "Border"]
 	if border then
-		-- Blizzard colors this by debuff type on every update; we just make it a flat 2px frame
-		border:SetTexture(media.flat)
-		border:SetTexCoord(0, 1, 0, 1)
-		border:SetDrawLayer("BACKGROUND")
-		border:ClearAllPoints()
-		border:SetPoint("TOPLEFT", -2, 2)
-		border:SetPoint("BOTTOMRIGHT", 2, -2)
+		-- Blizzard colors this by debuff type; we hide it and copy its color to our ring
+		border:SetAlpha(0)
+		button.afoBorder = border
 	end
 	local duration = _G[name .. "Duration"]
 	if duration then
@@ -123,7 +116,18 @@ ns:Listen("LOGIN", function()
 		if _G[fn] then hooksecurefunc(fn, LayoutAuras) end
 	end
 	hooksecurefunc("AuraButton_Update", function(buttonName, index, filter)
-		SkinAura(_G[buttonName .. index], filter == "HARMFUL")
+		local button = _G[buttonName .. index]
+		SkinAura(button, filter == "HARMFUL")
+		if button and button.afoBack then
+			local border = button.afoBorder
+			if border and filter == "HARMFUL" then
+				local r, g, b = border:GetVertexColor()
+				button.afoBack.ring:SetTexture(r or 0.7, g or 0.27, b or 0.23, 1)
+				button.afoBack.ring:Show()
+			else
+				button.afoBack.ring:Hide()
+			end
+		end
 	end)
 	hooksecurefunc("AuraButton_UpdateDuration", function(button, timeLeft)
 		local d = button.duration

@@ -20,6 +20,34 @@ function ns:Skin(frame, noFill)
 	end
 end
 
+-- Flat look for a Blizzard button WITHOUT touching its own textures:
+-- a separate frame one level below the button holds the 1px outline, the dark fill and
+-- an optional colored ring. It follows the button around and shows/hides with it.
+-- (Blizzard draws icons on the BACKGROUND layer, so anything we add inside the button
+-- on that layer can end up covering the icon.)
+function ns:Backing(button, parent)
+	local bg = CreateFrame("Frame", nil, parent or button:GetParent())
+	bg:SetPoint("TOPLEFT", button, "TOPLEFT", -1, 1)
+	bg:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 1, -1)
+	bg:SetFrameStrata(button:GetFrameStrata())
+	bg:SetFrameLevel(math.max(0, button:GetFrameLevel() - 1))
+	local outline = bg:CreateTexture(nil, "BACKGROUND")
+	outline:SetTexture(0, 0, 0, 1)
+	outline:SetAllPoints(bg)
+	bg.ring = bg:CreateTexture(nil, "BORDER")
+	bg.ring:SetPoint("TOPLEFT", -1, 1)
+	bg.ring:SetPoint("BOTTOMRIGHT", 1, -1)
+	bg.ring:Hide()
+	local fill = bg:CreateTexture(nil, "ARTWORK")
+	fill:SetTexture(colors.bg[1], colors.bg[2], colors.bg[3], 1)
+	fill:SetPoint("TOPLEFT", 1, -1)
+	fill:SetPoint("BOTTOMRIGHT", -1, 1)
+	button:HookScript("OnShow", function() bg:Show() end)
+	button:HookScript("OnHide", function() bg:Hide() end)
+	if not button:IsShown() then bg:Hide() end
+	return bg
+end
+
 -- Thin white ring used for "this is your target"
 function ns:SetHighlight(frame, on)
 	if not frame.outline then return end
