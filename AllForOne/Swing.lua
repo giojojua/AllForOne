@@ -15,9 +15,11 @@ local meleeOn, rangedOn = false, false
 -- abilities that replace your next main-hand swing, and casts that reset it
 local nextSwing, resetSwing = {}, {}
 
+local holder
+
 local function Bar(h, y, c)
-	local b = ns:CreateBar(ns.root, 360, h)
-	b:SetPoint("TOPLEFT", ns.root, "CENTER", -180, y)
+	local b = ns:CreateBar(holder, 360, h)
+	b:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, y)
 	b:SetStatusBarColor(c[1], c[2], c[3])
 	b:SetMinMaxValues(0, 1)
 	b:Hide()
@@ -100,8 +102,11 @@ ns:Listen("LOGIN", function()
 	ns.autoShot = GetSpellInfo(75)
 	ns.wandShot = GetSpellInfo(5019)
 
-	mh = Bar(5, -378, ns.colors.text)
-	oh = Bar(4, -385, ns.colors.muted)
+	holder = CreateFrame("Frame", nil, ns.root)
+	holder:SetSize(360, 11)
+	ns:Mover("swing", "SWING TIMER", holder, "TOPLEFT", "CENTER", -180, -346)
+	mh = Bar(5, 0, ns.colors.text)
+	oh = Bar(4, -7, ns.colors.muted)
 	lastMain, lastOff = UnitAttackSpeed("player")
 	driver:Show()
 end)

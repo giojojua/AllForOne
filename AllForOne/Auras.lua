@@ -46,14 +46,18 @@ local function SkinAura(button, isDebuff)
 	end
 end
 
+-- Blizzard's buff frame lives in UIParent; it follows our movable "buffs" holder
+local buffHolder
+
 local function PlaceBuffFrame()
+	if not buffHolder then return end
 	ns:SafeCall(function()
-		local scale = ns.root:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		local scale = buffHolder:GetEffectiveScale() / UIParent:GetEffectiveScale()
 		for _, f in ipairs({ BuffFrame, TemporaryEnchantFrame }) do
 			if f then
 				f:SetScale(scale)
 				f:ClearAllPoints()
-				f:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -14, 0)
+				f:SetPoint("TOPRIGHT", buffHolder, "TOPRIGHT", 0, 0)
 			end
 		end
 	end)
@@ -73,9 +77,14 @@ ns:Listen("LOGIN", function()
 		end
 	end)
 	for i = 1, 2 do SkinAura(_G["TempEnchant" .. i], false) end
+	-- default: left of the minimap (minimap is 168 wide, 24 from the edge, 14px gap)
+	buffHolder = CreateFrame("Frame", nil, ns.root)
+	buffHolder:SetSize(300, 110)
+	ns:Mover("buffs", "BUFFS / DEBUFFS", buffHolder, "TOPRIGHT", "TOPRIGHT", -206, -24)
 	PlaceBuffFrame()
 end)
 ns:Listen("MINIMAP_PLACED", PlaceBuffFrame)
+ns:Listen("LAYOUT_CHANGED", PlaceBuffFrame)
 ns:On("UI_SCALE_CHANGED", PlaceBuffFrame)
 
 ----------------------------------------------------------------------
@@ -86,7 +95,7 @@ local loc
 local function CreateLoC()
 	loc = CreateFrame("Frame", nil, ns.root)
 	loc:SetSize(220, 72)
-	loc:SetPoint("CENTER", ns.root, "CENTER", 0, 230)
+	ns:Mover("loc", "LOSS OF CONTROL", loc, "CENTER", "CENTER", 0, 230)
 	loc.icon = ns:CreateIcon(loc, 72, 1)
 	loc.icon:SetPoint("LEFT")
 	loc.icon.timer:Hide()
@@ -147,10 +156,14 @@ local procSlots = {}
 local SLOT_POS = { { -247, 16 }, { 247, 16 }, { -247, -84 }, { 247, -84 } }
 
 local function CreateProcs()
+	-- one holder spanning both sides of the character, so procs move/scale as a pair
+	local holder = CreateFrame("Frame", nil, ns.root)
+	holder:SetSize(630, 250)
+	ns:Mover("procs", "PROC ALERTS", holder, "CENTER", "CENTER", 0, -30)
 	for i, pos in ipairs(SLOT_POS) do
-		local s = CreateFrame("Frame", nil, ns.root)
+		local s = CreateFrame("Frame", nil, holder)
 		s:SetSize(134, 76)
-		s:SetPoint("CENTER", ns.root, "CENTER", pos[1], pos[2] - 10)
+		s:SetPoint("CENTER", holder, "CENTER", pos[1], pos[2] + 20)
 		s.icon = ns:CreateIcon(s, 56, 16)
 		s.icon:SetPoint("TOP")
 		s.icon:SetBorder(colors.kick[1], colors.kick[2], colors.kick[3])

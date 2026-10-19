@@ -282,16 +282,12 @@ function Row:Update()
 	self:UpdatePet()
 end
 
-local function CreateRow(unit, petUnit, enemy, index)
+local function CreateRow(unit, petUnit, enemy, index, holder)
 	local mirror = not enemy
-	local f = SecureUnit(ns.root, unit, ROW_W, 40, enemy and "focus" or nil)
+	local f = SecureUnit(holder, unit, ROW_W, 40, enemy and "focus" or nil)
 	f.mirror, f.enemy = mirror, enemy
 	for k, v in pairs(Row) do f[k] = v end
-	if enemy then
-		f:SetPoint("TOPRIGHT", ns.root, "TOPRIGHT", -180, -320 - (index - 1) * ROW_STRIDE)
-	else
-		f:SetPoint("TOPLEFT", ns.root, "TOPLEFT", 180, -320 - (index - 1) * ROW_STRIDE)
-	end
+	f:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -(index - 1) * ROW_STRIDE)
 
 	f.classIcon = ns:CreateIcon(f, 40)
 	f.classIcon:Show()
@@ -488,10 +484,9 @@ function Target:Update()
 	self:UpdateCombo()
 end
 
-local function CreateTarget()
-	-- design: target frame top-left at (838, 780) on 1920x1080 -> relative to screen center
-	local f = SecureUnit(ns.root, "target", 244, 44)
-	f:SetPoint("TOPLEFT", ns.root, "CENTER", -122, -240)
+local function CreateTarget(holder)
+	local f = SecureUnit(holder, "target", 244, 44)
+	f:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
 	for k, v in pairs(Target) do f[k] = v end
 
 	f.health = ns:CreateBar(f, 244, 36)
@@ -559,9 +554,9 @@ function Small:Update()
 end
 Small.UpdateHealth = Small.Update
 
-local function CreateSmall(unit, w, h, x, y, opts)
-	local f = SecureUnit(ns.root, unit, w, h)
-	f:SetPoint("TOPLEFT", ns.root, "CENTER", x, y)
+local function CreateSmall(unit, w, h, holder, opts)
+	local f = SecureUnit(holder, unit, w, h)
+	f:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
 	for k, v in pairs(Small) do f[k] = v end
 	f.prefix = opts.prefix
 	f.health = ns:CreateBar(f, w, h)
@@ -590,24 +585,48 @@ end
 ----------------------------------------------------------------------
 ns.frames = {}
 
+-- A plain frame that holds a group of parts so they move and scale together
+local function Holder(w, h)
+	local f = CreateFrame("Frame", nil, ns.root)
+	f:SetSize(w, h)
+	return f
+end
+
 ns:Listen("LOGIN", function()
 	local F = ns.frames
+	local groupH = 5 * ROW_STRIDE - 16
+
+	local team = Holder(ROW_W, groupH)
+	ns:Mover("team", "YOUR TEAM", team, "TOPLEFT", "TOPLEFT", 180, -320)
 	F.team = {}
-	F.team[1] = CreateRow("player", "pet", false, 1)
+	F.team[1] = CreateRow("player", "pet", false, 1, team)
 	for i = 1, 4 do
-		F.team[i + 1] = CreateRow("party" .. i, "partypet" .. i, false, i + 1)
+		F.team[i + 1] = CreateRow("party" .. i, "partypet" .. i, false, i + 1, team)
 	end
+
+	local arena = Holder(ROW_W, groupH)
+	ns:Mover("arena", "ENEMY TEAM", arena, "TOPRIGHT", "TOPRIGHT", -180, -320)
 	F.arena = {}
 	for i = 1, 5 do
-		F.arena[i] = CreateRow("arena" .. i, "arenapet" .. i, true, i)
+		F.arena[i] = CreateRow("arena" .. i, "arenapet" .. i, true, i, arena)
 	end
-	F.target = CreateTarget()
-	F.tot = CreateSmall("targettarget", 96, 20, 130, -248, { font = 13 })
-	F.focus = CreateSmall("focus", 184, 22, 130, -278, { font = 14, percent = true, prefix = "F · ", cast = true })
 
-	-- your cast bar, above the action bars
+	-- center column, positions from the 1920x1080 design relative to screen center
+	local target = Holder(244, 44)
+	ns:Mover("target", "TARGET", target, "TOPLEFT", "CENTER", -122, -240)
+	F.target = CreateTarget(target)
+
+	local tot = Holder(96, 20)
+	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 130, -248)
+	F.tot = CreateSmall("targettarget", 96, 20, tot, { font = 13 })
+
+	local focus = Holder(184, 35)
+	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 130, -278)
+	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true })
+
+	-- your cast bar, above the swing timer and stance/pet bars
 	local cast = ns:CreateCastbar(ns.root, 360, 18, { iconSize = 0, fontSize = 13, color = colors.player })
-	cast:SetPoint("TOPLEFT", ns.root, "CENTER", -180, -356)
+	ns:Mover("cast", "YOUR CAST BAR", cast, "TOPLEFT", "CENTER", -180, -324)
 	cast:SetUnit("player")
 	F.playerCast = cast
 
