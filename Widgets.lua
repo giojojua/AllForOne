@@ -216,14 +216,9 @@ function Cast:Paint()
 		c = self.baseColor or colors.kick
 	end
 	self.bar:SetStatusBarColor(c[1], c[2], c[3])
-	local dark = (not self.failed) and (not self.notInterruptible)
-	if dark then
-		self.spell:SetTextColor(0.07, 0.07, 0.07)
-		self.time:SetTextColor(0.07, 0.07, 0.07)
-	else
-		self.spell:SetTextColor(1, 1, 1)
-		self.time:SetTextColor(1, 1, 1)
-	end
+	-- white text with a black outline reads on both the filled and the unfilled part
+	self.spell:SetTextColor(1, 1, 1)
+	self.time:SetTextColor(1, 1, 1)
 	if self.lock then
 		if self.notInterruptible and not self.failed then self.lock:Show() else self.lock:Hide() end
 	end
@@ -311,6 +306,23 @@ function Cast:Fake(name, icon, progress, notInterruptible, channel)
 	self:Paint()
 end
 
+-- WoW also sends STOP / FAILED / INTERRUPTED for things that don't end the current cast:
+-- the start of a channel (Penance), or pressing another spell while casting/channeling.
+-- Blizzard's own cast bar checks first, and so do we.
+local function StillCasting(unit)
+	return unit and (UnitCastingInfo(unit) or UnitChannelInfo(unit))
+end
+
+function Cast:StopIfDone()
+	if self.fake then return end
+	if StillCasting(self.unit) then self:Begin() else self:Stop() end
+end
+
+function Cast:InterruptedIfDone(by)
+	if self.fake then return end
+	if StillCasting(self.unit) then self:Begin() else self:Interrupted(by) end
+end
+
 function Cast:SetUnit(unit)
 	if self.unit and castbars[self.unit] then
 		for i, b in ipairs(castbars[self.unit]) do
@@ -370,9 +382,9 @@ for _, ev in ipairs({ "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_DELAYED", "UNIT_SP
 	ns:On(ev, function(_, unit) ForUnit(unit, "Begin") end)
 end
 for _, ev in ipairs({ "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_CHANNEL_STOP" }) do
-	ns:On(ev, function(_, unit) ForUnit(unit, "Stop") end)
+	ns:On(ev, function(_, unit) ForUnit(unit, "StopIfDone") end)
 end
-ns:On("UNIT_SPELLCAST_INTERRUPTED", function(_, unit) ForUnit(unit, "Interrupted") end)
+ns:On("UNIT_SPELLCAST_INTERRUPTED", function(_, unit) ForUnit(unit, "InterruptedIfDone") end)
 
 -- Re-check casts when a unit token points at someone new
 local function RecheckAll(unit) ForUnit(unit, "Begin") end
@@ -384,7 +396,7 @@ ns:On("ARENA_OPPONENT_UPDATE", function(_, unit) if unit then RecheckAll(unit) e
 ns:Listen("INTERRUPTED", function(guid, by)
 	for unit, list in pairs(castbars) do
 		if UnitGUID(unit) == guid then
-			for _, b in ipairs(list) do b:Interrupted(by) end
+			for _, b in ipairs(list) do b:InterruptedIfDone(by) end
 		end
 	end
 end)
