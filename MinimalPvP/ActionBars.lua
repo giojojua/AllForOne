@@ -146,11 +146,14 @@ local function Row(prefix, holder, vertical, reparent)
 	end
 end
 
-local function AnchorSmallBar(prefix, count, holder)
+-- Right-aligned so the last stance/form button always sits next to the middle bars,
+-- however many forms the class has (Druid forms, Warrior stances, Rogue stealth, DK presences...)
+local function AnchorSmallBar(prefix, count, holder, shown)
 	local first = _G[prefix .. "1"]
 	if not first then return end
+	shown = math.max(1, math.min(count, shown or count))
 	first:ClearAllPoints()
-	first:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -((count - 1) * 33), 0)
+	first:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -((shown - 1) * 33), 0)
 	for i = 1, count do
 		local b = _G[prefix .. i]
 		if b then
@@ -182,8 +185,8 @@ end
 
 local function Reanchor()
 	ns:SafeCall(function()
-		AnchorSmallBar("ShapeshiftButton", 10, holders.MPvPStanceBar)
-		AnchorSmallBar("PossessButton", 2, holders.MPvPStanceBar)
+		AnchorSmallBar("ShapeshiftButton", 10, holders.MPvPStanceBar, GetNumShapeshiftForms())
+		AnchorSmallBar("PossessButton", 2, holders.MPvPStanceBar, 2)
 		AnchorPetBar()
 	end)
 end
@@ -266,4 +269,6 @@ ns:Listen("LOGIN", function()
 	if CooldownFrame_SetTimer then hooksecurefunc("CooldownFrame_SetTimer", OnCooldownSet) end
 	if not ns.db.actionbars then return end
 	ns:SafeCall(Build)
+	-- learning a new form/stance changes how many buttons there are
+	ns:On("UPDATE_SHAPESHIFT_FORMS", Reanchor)
 end)
