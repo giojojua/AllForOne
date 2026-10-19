@@ -9,6 +9,10 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 4. Restart the game (or `/reload`) and enable **AllForOne** on the character screen.
 5. Type `/afo test` to see every frame with sample arena data.
 
+**Updating:** after replacing the addon files with a newer version, fully restart the game (exit and launch again). A `/reload` doesn't pick up files that are new in that version.
+
+**Reloading in combat:** WoW locks unit frames and action bars during combat, so if you `/reload` mid-fight (e.g. on a training dummy) the UI loads as soon as combat ends.
+
 ### What's on screen
 - **Left:** you, then your party, each with PvP trinket, health/power, class icon, pet bar, cast bar, key cooldowns, and dispellable / CC debuffs.
 - **Right:** arena enemies 1–5, mirrored: spec, health/power, trinket, pet bar, cast bar, tracked cooldowns, diminishing-returns tracker. Right-click an enemy frame to set focus.
