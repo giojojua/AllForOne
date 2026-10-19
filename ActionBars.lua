@@ -41,9 +41,6 @@ local function SkinButton(b)
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		icon:ClearAllPoints()
 		icon:SetAllPoints(b)
-		-- Blizzard puts the spell icon on the BACKGROUND layer, the same layer as our
-		-- dark button fill below, which then covered it. Lift the icon above the fill.
-		icon:SetDrawLayer("ARTWORK")
 	end
 	for _, suffix in ipairs({ "NormalTexture", "NormalTexture2", "FloatingBG" }) do
 		local t = _G[name .. suffix]
@@ -72,13 +69,7 @@ local function SkinButton(b)
 		border:SetPoint("TOPLEFT", -1, 1)
 		border:SetPoint("BOTTOMRIGHT", 1, -1)
 	end
-	local outline = b:CreateTexture(nil, "BACKGROUND")
-	outline:SetTexture(0, 0, 0, 1)
-	outline:SetPoint("TOPLEFT", -1, 1)
-	outline:SetPoint("BOTTOMRIGHT", 1, -1)
-	local fill = b:CreateTexture(nil, "BACKGROUND")
-	fill:SetTexture(ns.colors.bg[1], ns.colors.bg[2], ns.colors.bg[3], 1)
-	fill:SetAllPoints(b)
+	ns:Backing(b)
 	local hl = b:GetHighlightTexture()
 	if hl then hl:SetTexture(1, 1, 1, 0.15); hl:SetAllPoints(b) end
 	local pushed = b:GetPushedTexture()
@@ -145,7 +136,8 @@ local function Row(prefix, holder, vertical, reparent)
 			else
 				b:SetPoint("LEFT", holder, "LEFT", (i - 1) * STEP, 0)
 			end
-			SkinButton(b)
+			local ok, err = pcall(SkinButton, b)
+			if not ok then ns:Report(err) end
 		end
 	end
 end
@@ -164,7 +156,8 @@ local function AnchorSmallBar(prefix, count, holder)
 				b:ClearAllPoints()
 				b:SetPoint("LEFT", _G[prefix .. (i - 1)], "RIGHT", 3, 0)
 			end
-			SkinButton(b)
+			local ok, err = pcall(SkinButton, b)
+			if not ok then ns:Report(err) end
 		end
 	end
 end
@@ -181,7 +174,8 @@ local function AnchorPetBar()
 				b:ClearAllPoints()
 				b:SetPoint("LEFT", _G["PetActionButton" .. (i - 1)], "RIGHT", 3, 0)
 			end
-			SkinButton(b)
+			local ok, err = pcall(SkinButton, b)
+			if not ok then ns:Report(err) end
 		end
 	end
 end
@@ -216,8 +210,9 @@ local function HideBlizzardBar()
 	for _, name in ipairs(ART) do
 		local t = _G[name]
 		if t then
-			t:SetTexture(nil)
+			if t.SetTexture then t:SetTexture(nil) end -- MainMenuBarPageNumber is a text label
 			t:SetAlpha(0)
+			t:Hide()
 		end
 	end
 end
