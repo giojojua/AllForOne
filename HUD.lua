@@ -45,6 +45,19 @@ local function SetupMinimap()
 		MiniMapInstanceDifficulty:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", 4, 4)
 	end
 
+	-- the queue eye, mail, LFD eye and other addons' minimap buttons must draw ABOVE the map
+	local function RaiseIcons()
+		local level = Minimap:GetFrameLevel() + 5
+		for _, child in ipairs({ Minimap:GetChildren() }) do
+			if child ~= MinimapBackdrop then
+				child:SetFrameStrata("MEDIUM")
+				child:SetFrameLevel(level)
+			end
+		end
+	end
+	RaiseIcons()
+	ns.RaiseMinimapIcons = RaiseIcons
+
 	-- wheel to zoom, right click for tracking
 	Minimap:EnableMouseWheel(true)
 	Minimap:SetScript("OnMouseWheel", function(_, delta)
@@ -69,6 +82,8 @@ local function SetupMinimap()
 		acc = 0
 		local _, _, latency = GetNetStats()
 		info:SetText(date("%H:%M") .. " · " .. (latency or 0) .. " ms")
+		local n = Minimap:GetNumChildren()
+		if n ~= t.children then t.children = n; RaiseIcons() end
 	end)
 	ns:Send("MINIMAP_PLACED")
 end

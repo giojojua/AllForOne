@@ -50,6 +50,39 @@ end
 -- Blizzard's buff frame lives in UIParent; it follows our movable "buffs" holder
 local buffHolder
 
+-- Our own grid instead of Blizzard's anchors (which offset the first row by the
+-- weapon-enchant frame): rows of 8 growing left from the holder's top-right corner,
+-- so the first row's top edge lines up exactly with the minimap's top edge.
+local BUFF_SIZE, DEBUFF_SIZE, GAP_X, PER_ROW = 30, 36, 6, 8
+local TIMER_H = 18 -- room for the countdown under each icon
+
+local function LayoutAuras()
+	if not buffHolder or not BuffFrame then return end
+	local col, y, rowH = 0, 0, BUFF_SIZE + TIMER_H
+	local function Place(button, size)
+		if col == PER_ROW then col, y = 0, y + rowH end
+		button:SetSize(size, size)
+		button:ClearAllPoints()
+		button:SetPoint("TOPRIGHT", BuffFrame, "TOPRIGHT", -col * (size + GAP_X), -y)
+		col = col + 1
+	end
+	for i = 1, 2 do
+		local b = _G["TempEnchant" .. i]
+		if b and b:IsShown() then Place(b, BUFF_SIZE) end
+	end
+	for i = 1, BUFF_MAX_DISPLAY or 16 do
+		local b = _G["BuffButton" .. i]
+		if b and b:IsShown() then Place(b, BUFF_SIZE) end
+	end
+	-- debuffs start on their own row, a little bigger
+	if col > 0 then col, y = 0, y + rowH end
+	rowH = DEBUFF_SIZE + TIMER_H
+	for i = 1, DEBUFF_MAX_DISPLAY or 8 do
+		local b = _G["DebuffButton" .. i]
+		if b and b:IsShown() then Place(b, DEBUFF_SIZE) end
+	end
+end
+
 local function PlaceBuffFrame()
 	if not buffHolder then return end
 	ns:SafeCall(function()
@@ -85,6 +118,10 @@ ns:Listen("LOGIN", function()
 		end)
 		BuffFrame_Update()
 	end
+	for _, fn in ipairs({ "BuffFrame_Update", "BuffFrame_UpdateAllBuffAnchors", "DebuffButton_UpdateAnchors",
+		"TemporaryEnchantFrame_Update" }) do
+		if _G[fn] then hooksecurefunc(fn, LayoutAuras) end
+	end
 	hooksecurefunc("AuraButton_Update", function(buttonName, index, filter)
 		SkinAura(_G[buttonName .. index], filter == "HARMFUL")
 	end)
@@ -98,9 +135,10 @@ ns:Listen("LOGIN", function()
 	for i = 1, 2 do SkinAura(_G["TempEnchant" .. i], false) end
 	-- default: left of the minimap (minimap is 168 wide, 24 from the edge, 14px gap)
 	buffHolder = CreateFrame("Frame", nil, ns.root)
-	buffHolder:SetSize(300, 110)
+	buffHolder:SetSize(PER_ROW * (BUFF_SIZE + GAP_X) - GAP_X, 168)
 	ns:Mover("buffs", "BUFFS / DEBUFFS", buffHolder, "TOPRIGHT", "TOPRIGHT", -206, -24)
 	PlaceBuffFrame()
+	LayoutAuras()
 end)
 ns:Listen("MINIMAP_PLACED", PlaceBuffFrame)
 ns:Listen("LAYOUT_CHANGED", PlaceBuffFrame)
