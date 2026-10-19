@@ -30,10 +30,20 @@ function ns:Listen(msg, fn)
 	listeners[msg] = listeners[msg] or {}
 	table.insert(listeners[msg], fn)
 end
+-- One failing module must not stop the others from loading: each listener runs
+-- protected, and errors still go to the normal Lua error display.
+function ns:Report(err)
+	local handler = geterrorhandler and geterrorhandler()
+	if handler then handler(err) else ns:Print("error:", err) end
+end
+
 function ns:Send(msg, ...)
 	local list = listeners[msg]
 	if list then
-		for i = 1, #list do list[i](...) end
+		for i = 1, #list do
+			local ok, err = pcall(list[i], ...)
+			if not ok then ns:Report(err) end
+		end
 	end
 end
 
