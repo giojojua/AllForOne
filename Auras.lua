@@ -260,6 +260,72 @@ function ns:ShowProcs(list)
 end
 
 ----------------------------------------------------------------------
+-- Your own proc list: defaults from Data.lua, plus what you add, minus what you remove.
+-- Saved for your account in AllForOneDB.procs (names compared case-insensitively).
+----------------------------------------------------------------------
+local function ProcDB()
+	ns.db.procs = ns.db.procs or {}
+	local db = ns.db.procs
+	db.added = db.added or {}
+	db.removed = db.removed or {}
+	return db
+end
+
+function ns:IsProc(name)
+	if not name then return false end
+	local db, key = ProcDB(), strlower(name)
+	if db.removed[key] then return false end
+	if db.added[key] then return true end
+	return ns.Proc[name] or false
+end
+
+-- "/afo procs add Hot Streak" or "/afo procs add 48108" (spell ID)
+local function SpellName(arg)
+	local id = tonumber(arg)
+	if id then return GetSpellInfo(id) end
+	return arg
+end
+
+function ns:ProcCommand(arg)
+	local db = ProcDB()
+	local action, rest = strsplit(" ", strtrim(arg or ""), 2)
+	action = strlower(action or "")
+	if action == "add" and rest and rest ~= "" then
+		local name = SpellName(strtrim(rest))
+		if not name then ns:Print("no spell with that ID") return end
+		db.added[strlower(name)] = name
+		db.removed[strlower(name)] = nil
+		ns:Print("now tracking proc:", name)
+	elseif (action == "remove" or action == "del") and rest and rest ~= "" then
+		local name = SpellName(strtrim(rest))
+		if not name then ns:Print("no spell with that ID") return end
+		db.removed[strlower(name)] = true
+		db.added[strlower(name)] = nil
+		ns:Print("stopped tracking proc:", name)
+	elseif action == "reset" then
+		wipe(db.added); wipe(db.removed)
+		ns:Print("proc list reset to the defaults")
+	else
+		local names = {}
+		for name in pairs(ns.Proc) do
+			if not db.removed[strlower(name)] then names[#names + 1] = name end
+		end
+		for _, name in pairs(db.added) do names[#names + 1] = name end
+		table.sort(names)
+		ns:Print("tracked procs (" .. #names .. "):")
+		for i = 1, #names, 6 do
+			ns:Print("  " .. table.concat(names, ", ", i, math.min(i + 5, #names)))
+		end
+		ns:Print("/afo procs add <name or spell ID> · /afo procs remove <name or ID> · /afo procs reset")
+		return
+	end
+	if not ns.testing then
+		local f = ns.ScanPlayer
+		if f then f() end
+	end
+end
+
+----------------------------------------------------------------------
 -- Scan your auras
 ----------------------------------------------------------------------
 local function ScanPlayer()
@@ -283,12 +349,13 @@ local function ScanPlayer()
 	for i = 1, 40 do
 		local name, _, icon, count, _, duration, expires = UnitAura("player", i, "HELPFUL")
 		if not name then break end
-		if ns.Proc[name] then
+		if ns:IsProc(name) then
 			procs[#procs + 1] = { name = name, icon = icon, count = count, dur = duration, expires = expires }
 		end
 	end
 	ns:ShowProcs(procs)
 end
+ns.ScanPlayer = ScanPlayer
 
 ns:Listen("LOGIN", function()
 	CreateLoC()

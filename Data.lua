@@ -218,6 +218,13 @@ local racialList = {
 	{ 58984, 120 },  -- Shadowmeld
 }
 
+-- Spells that reset other cooldowns: { reset spell, list of spells it resets } ("all" = every tracked cooldown of that class)
+local resetList = {
+	{ 14185, { 26669, 11305, 26889, 14177, 36554, 14183 } },               -- Preparation: Evasion, Sprint, Vanish, Cold Blood, Shadowstep, Premeditation
+	{ 11958, { 45438, 42917, 43039, 42931, 44572, 12472, 31687 } },        -- Cold Snap: Ice Block, Frost Nova, Ice Barrier, Cone of Cold, Deep Freeze, Icy Veins, Water Elemental
+	{ 23989, "all" },                                                      -- Readiness
+}
+
 -- PvP trinket and the Human racial that does the same thing
 ns.trinketSpells = { 42292, 59752 }
 ns.trinketCooldown = 120
@@ -274,7 +281,7 @@ local procList = {
 ----------------------------------------------------------------------
 -- Build name-keyed lookups (runs at login, when spell names are known)
 ----------------------------------------------------------------------
-ns.CC, ns.CD, ns.Racial, ns.Spec, ns.Proc, ns.Trinket = {}, {}, {}, {}, {}, {}
+ns.CC, ns.CD, ns.Racial, ns.Spec, ns.Proc, ns.Trinket, ns.Resets = {}, {}, {}, {}, {}, {}, {}
 ns.classCooldowns = {}  -- class -> ordered list of cooldown records
 
 local function Info(id)
@@ -318,6 +325,21 @@ ns:Listen("LOGIN", function()
 	for _, id in ipairs(procList) do
 		local name = Info(id)
 		if name then ns.Proc[name] = true end
+	end
+	for _, e in ipairs(resetList) do
+		local name = Info(e[1])
+		if name then
+			if e[2] == "all" then
+				ns.Resets[name] = "all"
+			else
+				local list = {}
+				for _, id in ipairs(e[2]) do
+					local n = Info(id)
+					if n then list[#list + 1] = n end
+				end
+				ns.Resets[name] = list
+			end
+		end
 	end
 	for _, id in ipairs(ns.trinketSpells) do
 		local name = Info(id)
