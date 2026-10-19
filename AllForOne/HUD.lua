@@ -6,9 +6,12 @@ local colors, media = ns.colors, ns.media
 -- Minimap: square, top-right, clock + latency under it
 ----------------------------------------------------------------------
 local function SetupMinimap()
-	Minimap:SetParent(ns.root)
+	local holder = CreateFrame("Frame", nil, ns.root)
+	holder:SetSize(168, 168)
+	ns:Mover("minimap", "MINIMAP", holder, "TOPRIGHT", "TOPRIGHT", -24, -24)
+	Minimap:SetParent(holder)
 	Minimap:ClearAllPoints()
-	Minimap:SetPoint("TOPRIGHT", ns.root, "TOPRIGHT", -24, -24)
+	Minimap:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
 	Minimap:SetSize(168, 168)
 	Minimap:SetMaskTexture(media.flat)
 	Minimap:SetFrameStrata("LOW")
@@ -55,7 +58,7 @@ local function SetupMinimap()
 		end
 	end)
 
-	local info = ns:CreateText(ns.root, 13, true, "RIGHT")
+	local info = ns:CreateText(holder, 13, true, "RIGHT")
 	info:SetPoint("TOPRIGHT", Minimap, "BOTTOMRIGHT", 0, -6)
 	info:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
 	local t = CreateFrame("Frame")
@@ -128,7 +131,6 @@ end
 local function SetupMenu()
 	local f = CreateFrame("Frame", "AFOMenu", ns.root)
 	f:SetSize(10, 60)
-	f:SetPoint("BOTTOMRIGHT", ns.root, "BOTTOMRIGHT", -24, 24)
 	menuFrame = f
 
 	-- bottom row: game menu text buttons
@@ -156,6 +158,7 @@ local function SetupMenu()
 		buttons[#buttons + 1] = b
 	end
 	f:SetWidth(x)
+	ns:Mover("menu", "BAGS + MENU", f, "BOTTOMRIGHT", "BOTTOMRIGHT", -24, 24)
 
 	-- top row: free slots + gold, then bags (backpack on the right)
 	f.bags = {}
@@ -228,7 +231,7 @@ end
 local function SetupXP()
 	xp = CreateFrame("Frame", nil, ns.root)
 	xp:SetSize(12 * 39 - 3, 6)
-	xp:SetPoint("BOTTOM", ns.root, "BOTTOM", 0, 16)
+	ns:Mover("xp", "XP / REP", xp, "BOTTOM", "BOTTOM", 0, 16)
 	xp.rested = ns:CreateBar(xp, 1, 6)
 	xp.rested:SetAllPoints(xp)
 	xp.rested:SetStatusBarColor(colors.rested[1], colors.rested[2], colors.rested[3], 0.35)
@@ -291,7 +294,7 @@ end
 local function SetupArena()
 	status = CreateFrame("Frame", nil, ns.root)
 	status:SetSize(300, 30)
-	status:SetPoint("TOP", ns.root, "TOP", 0, -20)
+	ns:Mover("arenastatus", "ARENA TIMER", status, "TOP", "TOP", 0, -20)
 	ns:Skin(status)
 	status.fill:SetTexture(0.03, 0.035, 0.043, 0.85)
 	status.map = ns:CreateText(status, 15, true, "LEFT")
@@ -303,7 +306,7 @@ local function SetupArena()
 
 	countdown = CreateFrame("Frame", nil, ns.root)
 	countdown:SetSize(400, 120)
-	countdown:SetPoint("TOP", ns.root, "TOP", 0, -96)
+	ns:Mover("countdown", "GATES COUNTDOWN", countdown, "TOP", "TOP", 0, -96)
 	countdown.label = ns:CreateText(countdown, 16, true, "CENTER")
 	countdown.label:SetPoint("TOP")
 	countdown.label:SetText("GATES OPEN IN")

@@ -233,6 +233,12 @@ SlashCmdList.ALLFORONE = function(msg)
 	local cmd, arg = strsplit(" ", strlower(strtrim(msg or "")), 2)
 	if cmd == "test" then
 		ns:Send("TOGGLE_TEST")
+	elseif cmd == "unlock" or cmd == "move" then
+		ns:Unlock()
+	elseif cmd == "lock" then
+		ns:Lock()
+	elseif cmd == "reset" then
+		ns:ResetLayout()
 	elseif cmd == "scale" and tonumber(arg) then
 		ns.db.scale = math.max(0.5, math.min(2, tonumber(arg)))
 		ns:UpdateScale()
@@ -253,8 +259,10 @@ SlashCmdList.ALLFORONE = function(msg)
 		ns:Print(cmd, ns.db[cmd] and "on" or "off", "- type /reload to apply")
 	else
 		ns:Print("commands:")
+		ns:Print("/afo unlock - move (drag) and resize (mouse wheel) any part; /afo lock to save")
+		ns:Print("/afo reset - put every part back where it started")
 		ns:Print("/afo test - show every frame with sample data")
-		ns:Print("/afo scale 0.9 - resize the whole UI")
+		ns:Print("/afo scale 0.9 - resize the whole UI at once")
 		ns:Print("/afo colors - class-colored bars on/off")
 		ns:Print("/afo menu 0.4 - idle opacity of bags and menu (0-1)")
 		ns:Print("/afo font - bundled font on/off (off for Cyrillic/Asian names)")

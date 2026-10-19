@@ -1,8 +1,9 @@
 -- AllForOne: action bars
 -- Reuses Blizzard's own buttons (your keybinds and macros keep working), moved and restyled:
---   3 rows bottom-center: main bar, bottom-left bar (Shift row), bottom-right bar (Ctrl row)
+--   3 rows bottom-center: bar 1 (main) at the bottom, bar 2 (bottom-left) above it, bar 3 (bottom-right) on top
 --   2 columns bottom-right above the bags: right bar (inner), right bar 2 (outer)
---   stance bar left of the middle rows, pet bar right of them
+--   above the 3 rows: stance/forms/auras in the left corner, pet bar in the right corner
+-- Every bar is movable and resizable with /afo unlock.
 local _, ns = ...
 local media = ns.media
 local BTN, GAP = 36, 3
@@ -10,12 +11,12 @@ local STEP = BTN + GAP
 
 local holders = {}
 
-local function Holder(name, w, h, point, x, y)
+local function Holder(name, label, w, h, point, x, y)
 	local f = CreateFrame("Frame", name, ns.root, "SecureHandlerStateTemplate")
 	f:SetSize(w, h)
-	f:SetPoint(point, ns.root, point, x, y)
 	RegisterStateDriver(f, "visibility", "[vehicleui] hide; show")
 	holders[name] = f
+	ns:Mover(name, label, f, point, point, x, y)
 	return f
 end
 
@@ -146,14 +147,13 @@ local function Row(prefix, holder, vertical, reparent)
 	end
 end
 
--- Right-aligned so the last stance/form button always sits next to the middle bars,
--- however many forms the class has (Druid forms, Warrior stances, Rogue stealth, DK presences...)
-local function AnchorSmallBar(prefix, count, holder, shown)
+-- Left-aligned from the left corner of the action bars
+-- (Druid forms, Warrior stances, Rogue stealth, DK presences, Paladin auras...)
+local function AnchorSmallBar(prefix, count, holder)
 	local first = _G[prefix .. "1"]
 	if not first then return end
-	shown = math.max(1, math.min(count, shown or count))
 	first:ClearAllPoints()
-	first:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -((shown - 1) * 33), 0)
+	first:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", 0, 0)
 	for i = 1, count do
 		local b = _G[prefix .. i]
 		if b then
@@ -185,23 +185,26 @@ end
 
 local function Reanchor()
 	ns:SafeCall(function()
-		AnchorSmallBar("ShapeshiftButton", 10, holders.AFOStanceBar, GetNumShapeshiftForms())
-		AnchorSmallBar("PossessButton", 2, holders.AFOStanceBar, 2)
+		AnchorSmallBar("ShapeshiftButton", 10, holders.AFOStanceBar)
+		AnchorSmallBar("PossessButton", 2, holders.AFOStanceBar)
 		AnchorPetBar()
 	end)
 end
 
 local function Build()
-	-- three middle rows; bottom row ends 30px above the screen edge (XP bar goes under)
-	local main = Holder("AFOMainBar", 12 * STEP - GAP, BTN, "BOTTOM", 0, 108)
-	local bar2 = Holder("AFOBar2", 12 * STEP - GAP, BTN, "BOTTOM", 0, 69)
-	local bar3 = Holder("AFOBar3", 12 * STEP - GAP, BTN, "BOTTOM", 0, 30)
+	-- three middle rows: bar 1 at the bottom (30px up, the XP bar goes under), bar 2, then bar 3 on top
+	local rowW = 12 * STEP - GAP
+	local main = Holder("AFOMainBar", "ACTION BAR 1", rowW, BTN, "BOTTOM", 0, 30)
+	local bar2 = Holder("AFOBar2", "ACTION BAR 2", rowW, BTN, "BOTTOM", 0, 69)
+	local bar3 = Holder("AFOBar3", "ACTION BAR 3", rowW, BTN, "BOTTOM", 0, 108)
 	-- two columns bottom-right, above the bags
-	local right1 = Holder("AFORight1", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24 - STEP, 96)
-	local right2 = Holder("AFORight2", BTN, 12 * STEP - GAP, "BOTTOMRIGHT", -24, 96)
-	-- stance (left) and pet (right) bars, level with the main row
-	local stance = Holder("AFOStanceBar", 10 * 33, 30, "BOTTOM", -(12 * STEP) / 2 - 12 - 165, 108)
-	local pet = Holder("AFOPetBar", 10 * 33, 30, "BOTTOM", (12 * STEP) / 2 + 12 + 165, 108)
+	local right1 = Holder("AFORight1", "RIGHT BAR 1", BTN, rowW, "BOTTOMRIGHT", -24 - STEP, 96)
+	local right2 = Holder("AFORight2", "RIGHT BAR 2", BTN, rowW, "BOTTOMRIGHT", -24, 96)
+	-- above the top row: stance bar in the left corner, pet bar in the right corner
+	local smallW = 10 * 33 - 3
+	local above = 108 + BTN + 5
+	local stance = Holder("AFOStanceBar", "STANCES / FORMS", smallW, 30, "BOTTOM", -(rowW - smallW) / 2, above)
+	local pet = Holder("AFOPetBar", "PET BAR", smallW, 30, "BOTTOM", (rowW - smallW) / 2, above)
 
 	-- make sure all four extra bars are turned on
 	SHOW_MULTI_ACTIONBAR_1, SHOW_MULTI_ACTIONBAR_2, SHOW_MULTI_ACTIONBAR_3, SHOW_MULTI_ACTIONBAR_4 = "1", "1", "1", "1"
