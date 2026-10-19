@@ -1,0 +1,245 @@
+-- MinimalPvP: nameplates for 3.3.5
+-- 3.3.5 has no nameplate API: plates are unnamed children of WorldFrame.
+-- We hide Blizzard's art and draw our own bar on top, reading values from theirs.
+local _, ns = ...
+local colors = ns.colors
+local GetTime = GetTime
+
+local plates = {}
+local childCount = 0
+
+local function IsPlate(f)
+	if f:GetName() then return false end
+	local _, border = f:GetRegions()
+	return border and border.GetObjectType and border:GetObjectType() == "Texture"
+		and border:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
+end
+
+-- What is this plate? Blizzard colors the health bar by reaction / class.
+local function Classify(r, g, b)
+	if r > 0.9 and g < 0.2 and b < 0.2 then return "hostile" end
+	if r > 0.9 and g > 0.9 and b < 0.2 then return "neutral" end
+	if g > 0.9 and r < 0.2 and b < 0.2 then return "friendlyNPC" end
+	if b > 0.9 and r < 0.2 and g < 0.2 then return "friendlyPlayer" end
+	for class, c in pairs(RAID_CLASS_COLORS) do
+		if math.abs(c.r - r) < 0.03 and math.abs(c.g - g) < 0.03 and math.abs(c.b - b) < 0.03 then
+			return "enemyPlayer", class
+		end
+	end
+	return "hostile"
+end
+
+local function ArenaNumber(name)
+	if not name then return nil end
+	for i = 1, 5 do
+		if UnitName("arena" .. i) == name then return i end
+	end
+end
+
+----------------------------------------------------------------------
+-- Build our overlay for one plate
+----------------------------------------------------------------------
+local function Setup(plate)
+	local health, cast = plate:GetChildren()
+	local threat, hpBorder, castBorder, castShield, spellIcon, highlight, nameText, levelText, bossIcon, raidIcon, eliteIcon = plate:GetRegions()
+
+	-- hide Blizzard's visuals, keep the objects so we can read them
+	threat:SetTexture(nil)
+	hpBorder:SetTexture(nil)
+	castBorder:SetTexture(nil)
+	castShield:SetTexture(nil)
+	highlight:SetTexture(nil)
+	bossIcon:SetTexture(nil)
+	eliteIcon:SetTexture(nil)
+	spellIcon:SetAlpha(0)
+	nameText:SetAlpha(0)
+	levelText:SetAlpha(0)
+	health:SetAlpha(0)
+	cast:SetAlpha(0)
+
+	local d = { health = health, cast = cast, shield = castShield, nameText = nameText, raidIcon = raidIcon }
+	local f = CreateFrame("Frame", nil, plate)
+	f:SetSize(150, 60)
+	f:SetPoint("CENTER", health, "CENTER", 0, 0)
+	f:SetScale(ns.root:GetEffectiveScale() / plate:GetEffectiveScale())
+	d.frame = f
+
+	d.hp = ns:CreateBar(f, 128, 9)
+	d.hp:SetPoint("CENTER", f, "CENTER", 0, 0)
+
+	d.name = ns:CreateText(f, 13, true, "LEFT")
+	d.name:SetPoint("BOTTOMLEFT", d.hp, "TOPLEFT", 0, 3)
+	d.num = ns:CreateText(f, 13, true, "RIGHT")
+	d.num:SetPoint("BOTTOMRIGHT", d.hp, "TOPRIGHT", 0, 3)
+	d.name:SetPoint("RIGHT", d.num, "LEFT", -4, 0)
+
+	d.castbar = ns:CreateBar(f, 128, 6)
+	d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -3)
+	d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -3)
+	d.castbar:Hide()
+
+	d.pips = {}
+	for i = 1, 5 do
+		local pip = CreateFrame("Frame", nil, f)
+		pip:SetSize(14, 6)
+		ns:Skin(pip, true)
+		pip.fill = pip:CreateTexture(nil, "ARTWORK")
+		pip.fill:SetAllPoints(pip)
+		pip:Hide()
+		d.pips[i] = pip
+	end
+
+	-- auras: one big crowd-control icon, then a row of your debuffs
+	d.big = ns:CreateIcon(f, 36, 14)
+	d.mine = {}
+	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 22, 11) end
+
+	raidIcon:ClearAllPoints()
+	raidIcon:SetPoint("RIGHT", d.hp, "LEFT", -4, 0)
+	raidIcon:SetSize(16, 16)
+
+	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
+	plates[plate] = d
+	return d
+end
+
+----------------------------------------------------------------------
+-- Update one plate
+----------------------------------------------------------------------
+local function LayoutAuras(d, anchorTop, friendly, guid)
+	local best, mine = ns:GetAuras(guid)
+	if friendly then
+		mine = {}
+		if best and not best.dispel then best = nil end
+	end
+	-- mine row sits right above the name; big icon above that
+	local y = 3
+	for i, icon in ipairs(d.mine) do
+		local a = mine[i]
+		if a then
+			icon:ClearAllPoints()
+			icon:SetPoint("BOTTOMLEFT", anchorTop, "TOPLEFT", (i - 1) * 25, y)
+			icon:Set(a.icon, nil, a.dur, (not a.noTimer) and a.expires or nil)
+		else
+			icon:Clear()
+		end
+	end
+	if #mine > 0 then y = y + 22 + 5 end
+	if best then
+		d.big:ClearAllPoints()
+		d.big:SetPoint("BOTTOM", anchorTop, "TOP", 0, y)
+		d.big:Set(best.icon, nil, best.dur, (not best.noTimer) and best.expires or nil)
+		local c = friendly and (colors.dispel[best.dispel] or colors.dispel.Magic) or colors.danger
+		d.big:SetBorder(c[1], c[2], c[3])
+	else
+		d.big:Clear()
+	end
+end
+
+local function UpdatePlate(plate, d)
+	local r, g, b = d.health:GetStatusBarColor()
+	local kind, class = Classify(r, g, b)
+	local name = d.nameText:GetText()
+	local friendly = (kind == "friendlyPlayer" or kind == "friendlyNPC")
+	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
+	local arena = (not friendly) and ArenaNumber(name)
+
+	-- size + color
+	local w, h = 128, 9
+	if friendly then w, h = 90, 5 elseif isTarget then w, h = 150, 11 end
+	d.hp:SetSize(w, h)
+	if friendly then
+		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
+	elseif kind == "enemyPlayer" then
+		d.hp:SetStatusBarColor(ns:ClassColor(class))
+	else
+		d.hp:SetStatusBarColor(r, g, b)
+	end
+	ns:SetHighlight(d.hp, isTarget)
+	local min, max = d.health:GetMinMaxValues()
+	d.hp:SetMinMaxValues(min, max)
+	d.hp:SetValue(d.health:GetValue())
+
+	-- text (friendly plates stay nameless)
+	if friendly then
+		d.name:SetText("")
+		d.num:SetText("")
+	else
+		d.name:SetText(name or "")
+		d.num:SetText(arena and tostring(arena) or "")
+		if d.wasTarget ~= isTarget then
+			d.wasTarget = isTarget
+			ns:Font(d.name, isTarget and 14 or 13, true)
+		end
+	end
+
+	-- cast bar (Blizzard shows nameplate casts for your target)
+	if not friendly and d.cast:IsShown() then
+		local cmin, cmax = d.cast:GetMinMaxValues()
+		d.castbar:SetMinMaxValues(cmin, cmax)
+		d.castbar:SetValue(d.cast:GetValue())
+		local c = d.shield:IsShown() and colors.locked or colors.kick
+		d.castbar:SetStatusBarColor(c[1], c[2], c[3])
+		d.castbar:Show()
+	else
+		d.castbar:Hide()
+	end
+
+	-- combo points under your target's plate
+	local points = isTarget and GetComboPoints("player", "target") or 0
+	local below = d.castbar:IsShown() and d.castbar or d.hp
+	for i, pip in ipairs(d.pips) do
+		if points > 0 then
+			pip:ClearAllPoints()
+			pip:SetPoint("TOP", below, "BOTTOM", (i - 3) * 17, -3)
+			if i <= points then
+				pip.fill:SetTexture(colors.combo[1], colors.combo[2], colors.combo[3], 1)
+			else
+				pip.fill:SetTexture(0.14, 0.15, 0.16, 1)
+			end
+			pip:Show()
+		else
+			pip:Hide()
+		end
+	end
+
+	-- auras from the combat-log tracker
+	local guid
+	if arena then guid = UnitGUID("arena" .. arena)
+	elseif isTarget then guid = UnitGUID("target")
+	elseif name then guid = ns.nameToGUID[name] end
+	local anchorTop = friendly and d.hp or d.name
+	LayoutAuras(d, anchorTop, friendly, guid)
+end
+
+----------------------------------------------------------------------
+-- Scanner
+----------------------------------------------------------------------
+local scanner = CreateFrame("Frame")
+local acc = 0
+scanner:SetScript("OnUpdate", function(_, elapsed)
+	acc = acc + elapsed
+	if acc < 0.1 then return end
+	acc = 0
+	local n = WorldFrame:GetNumChildren()
+	if n ~= childCount then
+		childCount = n
+		local children = { WorldFrame:GetChildren() }
+		for _, child in ipairs(children) do
+			if not plates[child] and IsPlate(child) then
+				local d = Setup(child)
+				d.update = function() if child:IsShown() then UpdatePlate(child, d) end end
+			end
+		end
+	end
+	for plate, d in pairs(plates) do
+		if plate:IsShown() then UpdatePlate(plate, d) end
+	end
+end)
+scanner:Hide()
+
+ns:Listen("LOGIN", function()
+	if not ns.db.nameplates then return end
+	SetCVar("ShowClassColorInNameplate", "1")
+	scanner:Show()
+end)

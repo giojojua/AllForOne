@@ -1,0 +1,17 @@
+## Interface: 30300
+## Title: MinimalPvP
+## Notes: Minimal, PvP-focused UI: arena/team frames, trackers, nameplates, bars.
+## Author: giojojua
+## Version: 0.1.0
+## SavedVariables: MinimalPvPDB
+
+Core.lua
+Data.lua
+Widgets.lua
+Trackers.lua
+Units.lua
+Auras.lua
+Nameplates.lua
+ActionBars.lua
+HUD.lua
+TestMode.lua

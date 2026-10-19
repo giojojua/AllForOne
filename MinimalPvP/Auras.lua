@@ -1,0 +1,225 @@
+-- MinimalPvP: your buffs/debuffs (by the minimap), loss-of-control alert, proc alerts
+local _, ns = ...
+local colors, media = ns.colors, ns.media
+local GetTime = GetTime
+
+----------------------------------------------------------------------
+-- Buffs + debuffs: keep Blizzard's (right-click to cancel still works),
+-- move them next to the minimap and restyle them.
+----------------------------------------------------------------------
+local skinned = {}
+
+local function SkinAura(button, isDebuff)
+	if not button or skinned[button] then return end
+	skinned[button] = true
+	local name = button:GetName()
+	local icon = _G[name .. "Icon"]
+	if icon then
+		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		icon:SetAllPoints(button)
+	end
+	local outline = button:CreateTexture(nil, "BACKGROUND")
+	outline:SetTexture(0, 0, 0, 1)
+	outline:SetPoint("TOPLEFT", -1, 1)
+	outline:SetPoint("BOTTOMRIGHT", 1, -1)
+	local border = _G[name .. "Border"]
+	if border then
+		-- Blizzard colors this by debuff type on every update; we just make it a flat 2px frame
+		border:SetTexture(media.flat)
+		border:SetTexCoord(0, 1, 0, 1)
+		border:SetDrawLayer("BACKGROUND")
+		border:ClearAllPoints()
+		border:SetPoint("TOPLEFT", -2, 2)
+		border:SetPoint("BOTTOMRIGHT", 2, -2)
+	end
+	local duration = _G[name .. "Duration"]
+	if duration then
+		ns:Font(duration, isDebuff and 13 or 12, true)
+		duration:ClearAllPoints()
+		duration:SetPoint("TOP", button, "BOTTOM", 0, -3)
+	end
+	local count = _G[name .. "Count"]
+	if count then
+		ns:Font(count, 12, true)
+		count:ClearAllPoints()
+		count:SetPoint("BOTTOMRIGHT", 2, -2)
+	end
+end
+
+local function PlaceBuffFrame()
+	ns:SafeCall(function()
+		local scale = ns.root:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		for _, f in ipairs({ BuffFrame, TemporaryEnchantFrame }) do
+			if f then
+				f:SetScale(scale)
+				f:ClearAllPoints()
+				f:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -14, 0)
+			end
+		end
+	end)
+end
+
+ns:Listen("LOGIN", function()
+	SetCVar("consolidateBuffs", "0")
+	SetCVar("buffDurations", "1")
+	hooksecurefunc("AuraButton_Update", function(buttonName, index, filter)
+		SkinAura(_G[buttonName .. index], filter == "HARMFUL")
+	end)
+	hooksecurefunc("AuraButton_UpdateDuration", function(button, timeLeft)
+		local d = button.duration
+		if d and timeLeft then
+			d:SetText(ns:FormatTime(timeLeft))
+			d:SetTextColor(1, 1, 1)
+		end
+	end)
+	for i = 1, 2 do SkinAura(_G["TempEnchant" .. i], false) end
+	PlaceBuffFrame()
+end)
+ns:Listen("MINIMAP_PLACED", PlaceBuffFrame)
+ns:On("UI_SCALE_CHANGED", PlaceBuffFrame)
+
+----------------------------------------------------------------------
+-- Loss of control: big icon above your character
+----------------------------------------------------------------------
+local loc
+
+local function CreateLoC()
+	loc = CreateFrame("Frame", nil, ns.root)
+	loc:SetSize(220, 72)
+	loc:SetPoint("CENTER", ns.root, "CENTER", 0, 230)
+	loc.icon = ns:CreateIcon(loc, 72, 1)
+	loc.icon:SetPoint("LEFT")
+	loc.icon.timer:Hide()
+	loc.icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
+	loc.label = ns:CreateText(loc, 15, true, "LEFT")
+	loc.label:SetPoint("TOPLEFT", loc.icon, "TOPRIGHT", 14, -2)
+	loc.label:SetTextColor(colors.danger[1], colors.danger[2], colors.danger[3])
+	loc.time = ns:CreateText(loc, 44, true, "LEFT")
+	loc.time:SetPoint("LEFT", loc.icon, "RIGHT", 14, -2)
+	loc.sub = ns:CreateText(loc, 14, true, "LEFT")
+	loc.sub:SetPoint("BOTTOMLEFT", loc.icon, "BOTTOMRIGHT", 14, 2)
+	loc.sub:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+	loc:SetScript("OnUpdate", function(self)
+		local left = (self.expires or 0) - GetTime()
+		if self.expires and left <= 0 then self:Hide() return end
+		self.time:SetText(self.expires and format("%.1f", left) or "")
+	end)
+	loc:Hide()
+end
+
+-- Your own PvP trinket (either trinket slot) or the Human racial
+local function TrinketStatus()
+	local start, duration
+	local pvpName = GetSpellInfo(42292)
+	for slot = 13, 14 do
+		local link = GetInventoryItemLink("player", slot)
+		if link and pvpName and GetItemSpell(link) == pvpName then
+			start, duration = GetInventoryItemCooldown("player", slot)
+			break
+		end
+	end
+	if not start then
+		local emfh = GetSpellInfo(59752)
+		if emfh and GetSpellInfo(emfh) then start, duration = GetSpellCooldown(emfh) end
+	end
+	if not start then return "" end
+	if start > 0 and duration > 1.5 then
+		return "Trinket " .. ns:FormatTime(start + duration - GetTime())
+	end
+	return "Trinket ready"
+end
+
+function ns:ShowLoC(icon, cat, duration, expires)
+	if not loc then return end
+	if not icon then loc:Hide() return end
+	loc.icon:Set(icon, nil, duration, expires, true)
+	loc.icon.timer:SetText("")
+	loc.label:SetText(ns.ccLabel[cat] or "")
+	loc.expires = expires and expires > 0 and expires or nil
+	loc.sub:SetText(TrinketStatus())
+	loc:Show()
+end
+
+----------------------------------------------------------------------
+-- Procs: glowing icons left and right of your character
+----------------------------------------------------------------------
+local procSlots = {}
+local SLOT_POS = { { -247, 16 }, { 247, 16 }, { -247, -84 }, { 247, -84 } }
+
+local function CreateProcs()
+	for i, pos in ipairs(SLOT_POS) do
+		local s = CreateFrame("Frame", nil, ns.root)
+		s:SetSize(134, 76)
+		s:SetPoint("CENTER", ns.root, "CENTER", pos[1], pos[2] - 10)
+		s.icon = ns:CreateIcon(s, 56, 16)
+		s.icon:SetPoint("TOP")
+		s.icon:SetBorder(colors.kick[1], colors.kick[2], colors.kick[3])
+		s.glow = s:CreateTexture(nil, "BACKGROUND")
+		s.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+		s.glow:SetBlendMode("ADD")
+		s.glow:SetVertexColor(colors.kick[1], colors.kick[2], colors.kick[3], 0.8)
+		s.glow:SetPoint("CENTER", s.icon, "CENTER")
+		s.glow:SetSize(104, 104)
+		s.label = ns:CreateText(s, 12, true, "CENTER")
+		s.label:SetPoint("TOP", s.icon, "BOTTOM", 0, -6)
+		s.label:SetTextColor(colors.kick[1], colors.kick[2], colors.kick[3])
+		s.icon.count:ClearAllPoints()
+		s.icon.count:SetPoint("BOTTOMRIGHT", 3, -4)
+		ns:Font(s.icon.count, 18, true)
+		s:Hide()
+		procSlots[i] = s
+	end
+end
+
+function ns:ShowProcs(list)
+	for i, s in ipairs(procSlots) do
+		local p = list[i]
+		if p then
+			s.icon:Set(p.icon, p.count, p.dur, p.expires)
+			s.label:SetText(strupper(p.name))
+			s:Show()
+		else
+			s.icon:Clear()
+			s:Hide()
+		end
+	end
+end
+
+----------------------------------------------------------------------
+-- Scan your auras
+----------------------------------------------------------------------
+local function ScanPlayer()
+	if ns.testing then return end
+	-- worst crowd control on you
+	local best, bestPrio
+	for i = 1, 40 do
+		local name, _, icon, _, _, duration, expires = UnitAura("player", i, "HARMFUL")
+		if not name then break end
+		local cc = ns.CC[name]
+		if cc then
+			local p = ns.ccPriority[cc.cat] or 0
+			if not best or p > bestPrio then
+				best, bestPrio = { icon = icon, cat = cc.cat, dur = duration, expires = expires }, p
+			end
+		end
+	end
+	if best then ns:ShowLoC(best.icon, best.cat, best.dur, best.expires) else ns:ShowLoC(nil) end
+
+	local procs = {}
+	for i = 1, 40 do
+		local name, _, icon, count, _, duration, expires = UnitAura("player", i, "HELPFUL")
+		if not name then break end
+		if ns.Proc[name] then
+			procs[#procs + 1] = { name = name, icon = icon, count = count, dur = duration, expires = expires }
+		end
+	end
+	ns:ShowProcs(procs)
+end
+
+ns:Listen("LOGIN", function()
+	CreateLoC()
+	CreateProcs()
+	ScanPlayer()
+end)
+ns:On("UNIT_AURA", function(_, unit) if unit == "player" then ScanPlayer() end end)
+ns:On("PLAYER_ENTERING_WORLD", ScanPlayer)
