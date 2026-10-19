@@ -607,7 +607,7 @@ ns:Listen("LOGIN", function()
 
 	-- your cast bar, above the action bars
 	local cast = ns:CreateCastbar(ns.root, 360, 18, { iconSize = 0, fontSize = 13, color = colors.player })
-	cast:SetPoint("TOPLEFT", ns.root, "CENTER", -180, -364)
+	cast:SetPoint("TOPLEFT", ns.root, "CENTER", -180, -356)
 	cast:SetUnit("player")
 	F.playerCast = cast
 
