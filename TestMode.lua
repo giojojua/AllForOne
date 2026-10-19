@@ -13,6 +13,7 @@ local function UseCooldown(guid, class, index, ago)
 	if not rec then return end
 	ns.cds[guid] = ns.cds[guid] or {}
 	ns.cds[guid][rec.name] = { start = GetTime() - ago, dur = rec.cd, icon = rec.icon }
+	ns:NoteCooldownUsed(guid, class, rec.name)
 end
 
 local function Start()
@@ -90,7 +91,7 @@ end
 
 local function Stop()
 	ns.testing = false
-	for _, t in ipairs({ ns.cds, ns.trinkets, ns.dr, ns.specs }) do
+	for _, t in ipairs({ ns.cds, ns.trinkets, ns.dr, ns.specs, ns.cdOrder }) do
 		for k in pairs(t) do
 			if type(k) == "string" and k:match("^test%-") then t[k] = nil end
 		end

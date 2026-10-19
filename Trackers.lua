@@ -10,6 +10,7 @@ ns.trinkets = {}   -- guid -> time the PvP trinket was used
 ns.dr = {}         -- guid -> { [category] = { count, reset, icon, active } }
 ns.auras = {}      -- guid -> { [spellName] = { icon, dur, expires, cc, mine, dispel } }
 ns.nameToGUID = {} -- player name (no realm) -> guid
+ns.cdOrder = {}    -- guid -> spell names in display order (icons never change slots)
 ns.DR_RESET = 18
 
 local tokens = { "player", "party1", "party2", "party3", "party4", "arena1", "arena2", "arena3", "arena4", "arena5" }
@@ -78,24 +79,56 @@ end
 ----------------------------------------------------------------------
 -- Getters used by frames and nameplates
 ----------------------------------------------------------------------
--- Cooldowns to show for a unit: the "always" spells for its class, plus any other used ones
-function ns:GetCooldowns(guid, class, max)
+-- Display order for a unit: its class's "always" spells first, then other cooldowns
+-- in the order they were first used. Existing icons never move.
+local function OrderFor(guid, class)
+	local order = ns.cdOrder[guid]
+	if not order then
+		order = {}
+		for _, rec in ipairs(class and ns.classCooldowns[class] or {}) do
+			if rec.always then order[#order + 1] = rec.name end
+		end
+		ns.cdOrder[guid] = order
+	end
+	return order
+end
+
+function ns:NoteCooldownUsed(guid, class, name)
+	local order = OrderFor(guid, class)
+	for _, n in ipairs(order) do
+		if n == name then return end
+	end
+	order[#order + 1] = name
+end
+
+-- Your own cooldowns: exact, straight from the game, only spells you know
+local function OwnCooldowns(class, max)
 	local out = {}
-	local used = guid and ns.cds[guid] or {}
-	local list = class and ns.classCooldowns[class] or {}
-	local now = GetTime()
-	for _, rec in ipairs(list) do
-		local u = used[rec.name]
-		if rec.always or u then
-			local active = u and (u.start + u.dur > now)
-			out[#out + 1] = { icon = rec.icon, start = active and u.start or nil, dur = active and u.dur or nil }
-			if #out >= max then return out end
+	for _, rec in ipairs(class and ns.classCooldowns[class] or {}) do
+		if GetSpellInfo(rec.name) then -- by name: only returns something for spells in your spellbook
+			local start, duration = GetSpellCooldown(rec.name)
+			local active = start and start > 0 and duration and duration > 1.5
+			out[#out + 1] = { icon = rec.icon, start = active and start or nil, dur = active and duration or nil }
+			if #out >= max then break end
 		end
 	end
-	for name, u in pairs(used) do
-		if ns.Racial[name] and #out < max then
-			local active = u.start + u.dur > now
-			out[#out + 1] = { icon = u.icon, start = active and u.start or nil, dur = active and u.dur or nil }
+	return out
+end
+
+-- Cooldowns to show under a unit's frame
+function ns:GetCooldowns(guid, class, max, unit)
+	if unit == "player" and not ns.testing then return OwnCooldowns(class, max) end
+	local out = {}
+	if not guid then return out end
+	local used = ns.cds[guid] or {}
+	local now = GetTime()
+	for _, name in ipairs(OrderFor(guid, class)) do
+		local rec = (class and ns.CD[class .. ":" .. name]) or ns.Racial[name]
+		if rec then
+			local u = used[name]
+			local active = u and (u.start + u.dur > now)
+			out[#out + 1] = { icon = rec.icon, start = active and u.start or nil, dur = active and u.dur or nil }
+			if #out >= max then break end
 		end
 	end
 	return out
@@ -153,12 +186,20 @@ local function StartCooldown(srcGUID, spellName, spellId)
 		return
 	end
 	local _, class = UnitClass(owner)
+	ns.cds[ownerGUID] = ns.cds[ownerGUID] or {}
+	-- Preparation / Cold Snap / Readiness: clear what they reset
+	local reset = ns.Resets[spellName]
+	if reset == "all" then
+		wipe(ns.cds[ownerGUID])
+	elseif reset then
+		for _, n in ipairs(reset) do ns.cds[ownerGUID][n] = nil end
+	end
 	local rec = class and ns.CD[class .. ":" .. spellName] or ns.Racial[spellName]
 	if rec then
-		ns.cds[ownerGUID] = ns.cds[ownerGUID] or {}
 		ns.cds[ownerGUID][spellName] = { start = now, dur = rec.cd, icon = rec.icon }
-		ns:Send("COOLDOWN", ownerGUID)
+		ns:NoteCooldownUsed(ownerGUID, class, spellName)
 	end
+	if rec or reset then ns:Send("COOLDOWN", ownerGUID) end
 	local spec = ns.Spec[spellName]
 	if spec and spec.class == class and ns.specs[ownerGUID] ~= spec.spec then
 		ns.specs[ownerGUID] = spec.spec
@@ -250,7 +291,7 @@ for _, ev in ipairs({ "PARTY_MEMBERS_CHANGED", "ARENA_OPPONENT_UPDATE", "UNIT_PE
 end
 
 ns:On("PLAYER_ENTERING_WORLD", function()
-	wipe(ns.cds); wipe(ns.trinkets); wipe(ns.dr); wipe(ns.auras)
+	wipe(ns.cds); wipe(ns.trinkets); wipe(ns.dr); wipe(ns.auras); wipe(ns.cdOrder)
 	local mine = ns.specs[UnitGUID("player") or ""]
 	wipe(ns.specs)
 	ns:UpdateUnitMap()

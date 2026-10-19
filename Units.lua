@@ -225,13 +225,18 @@ function Row:UpdateTrinket()
 end
 
 function Row:UpdateCooldowns()
-	local list = ns:GetCooldowns(U.GUID(self.unit), U.Class(self.unit), #self.cds)
+	local list = ns:GetCooldowns(U.GUID(self.unit), U.Class(self.unit), #self.cds, self.unit)
 	for i, icon in ipairs(self.cds) do
 		local e = list[i]
-		if e then
-			icon:Set(e.icon, nil, e.dur, e.start and (e.start + e.dur) or nil, true)
-		else
-			icon:Clear()
+		-- only touch an icon when what it shows actually changed (no flicker / restarted timers)
+		local key = e and (tostring(e.icon) .. ":" .. tostring(e.start) .. ":" .. tostring(e.dur)) or "-"
+		if icon.cdKey ~= key then
+			icon.cdKey = key
+			if e then
+				icon:Set(e.icon, nil, e.dur, e.start and (e.start + e.dur) or nil, true)
+			else
+				icon:Clear()
+			end
 		end
 	end
 end
@@ -711,6 +716,8 @@ ns:On("UNIT_PET", function(_, unit)
 end)
 ns:On("PLAYER_TARGET_CHANGED", function() ForUnit("target", "Update"); ForUnit("targettarget", "Update"); ns:RefreshAll() end)
 ns:On("PLAYER_FOCUS_CHANGED", function() ForUnit("focus", "Update") end)
+-- your own cooldowns are read live from the game
+ns:On("SPELL_UPDATE_COOLDOWN", function() ForUnit("player", "UpdateCooldowns") end)
 ns:On("UNIT_TARGET", function(_, unit) if unit == "target" then ForUnit("targettarget", "Update") end end)
 ns:On("UNIT_COMBO_POINTS", function()
 	if ns.frames.target then ns.frames.target:UpdateCombo(); ns.frames.target:UpdateAuras() end
@@ -736,8 +743,8 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 	acc = 0
 	if ns.frames.tot and ns.frames.tot:IsShown() then ns.frames.tot:Update() end
 	if ns.frames.team then
-		for _, f in ipairs(ns.frames.team) do if f:IsShown() then f:UpdateState() end end
-		for _, f in ipairs(ns.frames.arena) do if f:IsShown() then f:UpdateState(); f:UpdateSide() end end
+		for _, f in ipairs(ns.frames.team) do if f:IsShown() then f:UpdateState(); f:UpdateCooldowns() end end
+		for _, f in ipairs(ns.frames.arena) do if f:IsShown() then f:UpdateState(); f:UpdateSide(); f:UpdateCooldowns() end end
 	end
 end)
 
