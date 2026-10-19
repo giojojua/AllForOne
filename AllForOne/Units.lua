@@ -613,15 +613,15 @@ ns:Listen("LOGIN", function()
 
 	-- center column, positions from the 1920x1080 design relative to screen center
 	local target = Holder(244, 44)
-	ns:Mover("target", "TARGET", target, "TOPLEFT", "CENTER", -122, -240)
+	ns:Mover("target", "TARGET", target, "TOPLEFT", "CENTER", -122, -218)
 	F.target = CreateTarget(target)
 
 	local tot = Holder(96, 20)
-	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 130, -248)
+	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 130, -226)
 	F.tot = CreateSmall("targettarget", 96, 20, tot, { font = 13 })
 
 	local focus = Holder(184, 35)
-	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 130, -278)
+	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 130, -256)
 	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true })
 
 	-- your cast bar, above the swing timer and stance/pet bars
