@@ -140,10 +140,24 @@ end
 
 local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 
+-- Class icon for a unit: shown for players, hidden for NPCs
+local function PaintClassIcon(icon, unit)
+	local class = U.IsPlayer(unit) and U.Class(unit)
+	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+	if coords then
+		icon.tex:SetTexture(CLASS_TEX)
+		icon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+		icon:Show()
+	else
+		icon:Hide()
+	end
+end
+
 ----------------------------------------------------------------------
 -- Team / arena row
--- Layout (enemy side, left to right): class icon | health+power | trinket.
--- Team side is the exact mirror image.
+-- Layout, left to right: class icon | health+power | trinket. Same on both sides,
+-- so every frame has its class icon on the left. Side icons (enemy DR / team debuffs)
+-- sit on the side facing the screen center.
 ----------------------------------------------------------------------
 local ROW_W, ROW_STRIDE = 292, 126
 local Row = {}
@@ -283,7 +297,7 @@ function Row:Update()
 end
 
 local function CreateRow(unit, petUnit, enemy, index, holder)
-	local mirror = not enemy
+	local mirror = false
 	local f = SecureUnit(holder, unit, ROW_W, 40, enemy and "focus" or nil)
 	f.mirror, f.enemy = mirror, enemy
 	for k, v in pairs(Row) do f[k] = v end
@@ -328,7 +342,7 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	for i = 1, 4 do
 		local icon = ns:CreateIcon(f, 30, 12)
 		icon:ClearAllPoints()
-		if mirror then
+		if not enemy then
 			icon:SetPoint("TOPLEFT", f, "TOPLEFT", ROW_W + 8 + (i - 1) * 34, -5)
 		else
 			icon:SetPoint("TOPRIGHT", f, "TOPLEFT", -8 - (i - 1) * 34, -5)
@@ -486,6 +500,7 @@ function Target:Update()
 	if not U.Exists("target") then return end
 	self.nameText:SetText(LabelFor("target"))
 	PaintHealth(self.health, self.nameText, "target")
+	PaintClassIcon(self.classIcon, "target")
 	self:UpdateHealth()
 	self:UpdatePower()
 	self:UpdateAuras()
@@ -508,6 +523,10 @@ local function CreateTarget(holder)
 
 	f.power = ns:CreateBar(f, 244, 8)
 	f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2)
+
+	-- class icon on the left, as tall as health + power
+	f.classIcon = ns:CreateIcon(f, 46)
+	f.classIcon:SetPoint("TOPRIGHT", f.health, "TOPLEFT", -4, 0)
 
 	f.castbar = ns:CreateCastbar(f, 244, 22, { iconSize = 22, fontSize = 15 })
 	f.castbar:SetPoint("TOPLEFT", f.power, "BOTTOMLEFT", 0, -3)
@@ -559,6 +578,7 @@ function Small:Update()
 	self.nameText:SetText(label)
 	if self.hpText then self.hpText:SetText(floor(cur / max * 100 + 0.5) .. "%") end
 	PaintHealth(self.health, self.nameText, u)
+	PaintClassIcon(self.classIcon, u)
 end
 Small.UpdateHealth = Small.Update
 
@@ -569,6 +589,8 @@ local function CreateSmall(unit, w, h, holder, opts)
 	f.prefix = opts.prefix
 	f.health = ns:CreateBar(f, w, h)
 	f.health:SetAllPoints(f)
+	f.classIcon = ns:CreateIcon(f, h)
+	f.classIcon:SetPoint("TOPRIGHT", f, "TOPLEFT", -4, 0)
 	f.nameText = ns:CreateText(f.health, opts.font or 13, true, "LEFT")
 	f.nameText:SetPoint("LEFT", 6, 0)
 	if opts.percent then
@@ -625,11 +647,11 @@ ns:Listen("LOGIN", function()
 	F.target = CreateTarget(target)
 
 	local tot = Holder(96, 20)
-	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 130, -226)
+	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 154, -226)
 	F.tot = CreateSmall("targettarget", 96, 20, tot, { font = 13 })
 
 	local focus = Holder(184, 35)
-	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 130, -256)
+	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 154, -256)
 	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true })
 
 	-- your cast bar, above the swing timer and stance/pet bars
