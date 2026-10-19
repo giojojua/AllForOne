@@ -437,7 +437,7 @@ function Target:UpdatePower()
 	self.power:SetValue(cur or 0)
 end
 
--- Combo pips sit above the right end of the health bar, in the same band as the debuff row
+-- Combo points show for Rogues and Druids (or whenever you have points)
 local function ComboShown()
 	if ns.testing then return true end
 	local _, class = UnitClass("player")
@@ -473,8 +473,7 @@ function Target:UpdateAuras()
 		if (a.cc and 1 or 0) ~= (b.cc and 1 or 0) then return a.cc and true or false end
 		return (a.expires or 1e9) < (b.expires or 1e9)
 	end)
-	-- 8 debuffs fit above the frame; only 5 when combo points take the right end
-	local maxDebuffs = ComboShown() and 5 or #self.debuffs
+	local maxDebuffs = #self.debuffs
 	for i, icon in ipairs(self.debuffs) do
 		local a = i <= maxDebuffs and debuffs[i] or nil
 		if a then
@@ -498,6 +497,9 @@ end
 function Target:UpdateCombo()
 	local points = ns.testing and (ns.fakeCombo or 0) or GetComboPoints("player", "target")
 	local show = ComboShown()
+	-- power bar sits under the combo row when it's shown, else straight under health
+	self.power:ClearAllPoints()
+	self.power:SetPoint("TOPLEFT", self.health, "BOTTOMLEFT", 0, show and -(2 + self.pipH + 2) or -2)
 	for i, pip in ipairs(self.pips) do
 		if show then
 			pip:Show()
@@ -562,16 +564,20 @@ local function CreateTarget(holder)
 		f.debuffs[i] = icon
 	end
 
+	-- combo points: 5 segments as wide as the health bar, right under it
+	local PIP_GAP, PIP_H = 2, 5
+	local pipW = (244 - 4 * PIP_GAP) / 5
 	f.pips = {}
 	for i = 1, 5 do
 		local pip = CreateFrame("Frame", nil, f)
-		pip:SetSize(14, 8)
-		pip:SetPoint("BOTTOMRIGHT", f.health, "TOPRIGHT", -(5 - i) * 17, 12)
+		pip:SetSize(pipW, PIP_H)
+		pip:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", (i - 1) * (pipW + PIP_GAP), -2)
 		ns:Skin(pip, true)
 		pip.fill = pip:CreateTexture(nil, "ARTWORK")
 		pip.fill:SetAllPoints(pip)
 		f.pips[i] = pip
 	end
+	f.pipH = PIP_H
 
 	f:HookScript("OnShow", function(self) self:Update() end)
 	Track(f, "target")
