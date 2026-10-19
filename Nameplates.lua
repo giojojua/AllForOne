@@ -112,8 +112,42 @@ end
 ----------------------------------------------------------------------
 -- Update one plate
 ----------------------------------------------------------------------
-local function LayoutAuras(d, anchorTop, friendly, guid)
-	local best, mine = ns:GetAuras(guid)
+-- Read debuffs directly from a unit (exact icons and timers): your debuffs, and the
+-- highest-priority crowd control from anyone.
+local function ScanUnit(unit)
+	local best, bestPrio, mine = nil, -1, {}
+	for i = 1, 40 do
+		local name, _, icon, count, dispel, duration, expires, caster = UnitAura(unit, i, "HARMFUL")
+		if not name then break end
+		local a = { icon = icon, dur = duration, expires = (expires and expires > 0) and expires or nil, dispel = dispel }
+		a.noTimer = not a.expires
+		local cc = ns.CC[name]
+		if cc then
+			local p = ns.ccPriority[cc.cat] or 0
+			if p > bestPrio then best, bestPrio = a, p end
+		end
+		if caster == "player" or caster == "pet" then mine[#mine + 1] = a end
+	end
+	table.sort(mine, function(x, y) return (x.expires or 1e9) < (y.expires or 1e9) end)
+	return best, mine
+end
+
+-- Which unit token (if any) currently points at this plate's player
+local function PlateUnit(name, isTarget, arena)
+	if isTarget then return "target" end
+	if arena then return "arena" .. arena end
+	for _, u in ipairs({ "focus", "mouseover" }) do
+		if UnitExists(u) and UnitName(u) == name then return u end
+	end
+end
+
+local function LayoutAuras(d, anchorTop, friendly, guid, unit)
+	local best, mine
+	if unit then
+		best, mine = ScanUnit(unit)
+	else
+		best, mine = ns:GetAuras(guid)
+	end
 	if friendly then
 		mine = {}
 		if best and not best.dispel then best = nil end
@@ -233,13 +267,12 @@ local function UpdatePlate(plate, d)
 		end
 	end
 
-	-- auras from the combat-log tracker
-	local guid
-	if arena then guid = UnitGUID("arena" .. arena)
-	elseif isTarget then guid = UnitGUID("target")
-	elseif name then guid = ns.nameToGUID[name] end
+	-- auras: exact from the game when the player is your target/focus/mouseover/arena unit,
+	-- otherwise from the combat-log tracker (matched by name)
+	local unit = name and PlateUnit(name, isTarget, arena)
+	local guid = unit and UnitGUID(unit) or (name and ns.nameToGUID[name])
 	local anchorTop = friendly and d.hp or d.name
-	LayoutAuras(d, anchorTop, friendly, guid)
+	LayoutAuras(d, anchorTop, friendly, guid, unit)
 end
 
 ----------------------------------------------------------------------
