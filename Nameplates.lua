@@ -94,8 +94,14 @@ local function Setup(plate)
 	d.mine = {}
 	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 22, 11) end
 
+	-- class icon: always on the left of the health bar (bigger on your target)
+	d.classIcon = ns:CreateIcon(f, 20)
+	d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+	d.classIcon:SetPoint("RIGHT", d.hp, "LEFT", -5, 0)
+
+	-- raid markers (skull, X...) go on the right so they never cover the class icon
 	raidIcon:ClearAllPoints()
-	raidIcon:SetPoint("RIGHT", d.hp, "LEFT", -4, 0)
+	raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, 0)
 	raidIcon:SetSize(16, 16)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
@@ -144,6 +150,19 @@ local function UpdatePlate(plate, d)
 	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
 	local arena = (not friendly) and ArenaNumber(name)
 
+	-- Class: ask the game directly whenever we can, the bar color is only a fallback
+	-- (it only carries class when the class-color nameplate setting is active).
+	if not friendly then
+		local unit = isTarget and "target" or (arena and ("arena" .. arena)) or nil
+		if unit and UnitIsPlayer(unit) then
+			local _, c = UnitClass(unit)
+			if c then kind, class = "enemyPlayer", c end
+		elseif not class and name and ns.nameToGUID[name] and GetPlayerInfoByGUID then
+			local _, c = GetPlayerInfoByGUID(ns.nameToGUID[name])
+			if c then kind, class = "enemyPlayer", c end
+		end
+	end
+
 	-- size + color
 	local w, h = 128, 9
 	if friendly then w, h = 90, 5 elseif isTarget then w, h = 150, 11 end
@@ -156,6 +175,17 @@ local function UpdatePlate(plate, d)
 		d.hp:SetStatusBarColor(r, g, b)
 	end
 	ns:SetHighlight(d.hp, isTarget)
+
+	-- class icon for enemy players
+	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+	if kind == "enemyPlayer" and coords then
+		local size = isTarget and 24 or 20
+		d.classIcon:SetSize(size, size)
+		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+		d.classIcon:Show()
+	else
+		d.classIcon:Hide()
+	end
 	local min, max = d.health:GetMinMaxValues()
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
