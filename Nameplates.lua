@@ -7,6 +7,7 @@ local GetTime = GetTime
 
 local plates = {}
 local childCount = 0
+local npcIcons = {} -- npc name -> creature-type icon (learned from target/mouseover/focus)
 
 local function IsPlate(f)
 	if f:GetName() then return false end
@@ -52,8 +53,12 @@ local function Setup(plate)
 	bossIcon:SetTexture(nil)
 	eliteIcon:SetTexture(nil)
 	spellIcon:SetAlpha(0)
-	nameText:SetAlpha(0)
-	levelText:SetAlpha(0)
+	-- the game keeps resetting these, so park them on a hidden frame instead of fading them
+	-- (we still read the name with GetText)
+	for _, region in ipairs({ nameText, levelText, bossIcon, eliteIcon }) do
+		region:SetParent(ns.hider)
+		region:Hide()
+	end
 	health:SetAlpha(0)
 	cast:SetAlpha(0)
 
@@ -183,6 +188,7 @@ local function UpdatePlate(plate, d)
 	local friendly = (kind == "friendlyPlayer" or kind == "friendlyNPC")
 	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
 	local arena = (not friendly) and ArenaNumber(name)
+	local unit = name and PlateUnit(name, isTarget, arena)
 
 	-- Class: ask the game directly whenever we can, the bar color is only a fallback
 	-- (it only carries class when the class-color nameplate setting is active).
@@ -210,16 +216,24 @@ local function UpdatePlate(plate, d)
 	end
 	ns:SetHighlight(d.hp, isTarget)
 
-	-- class icon for enemy players
+	-- icon on the left for everyone: class icon for players, creature-type icon for NPCs
+	local size = friendly and 14 or (isTarget and 24 or 20)
+	d.classIcon:SetSize(size, size)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
-	if kind == "enemyPlayer" and coords then
-		local size = isTarget and 24 or 20
-		d.classIcon:SetSize(size, size)
-		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
-		d.classIcon:Show()
-	else
-		d.classIcon:Hide()
+	if not coords and unit and UnitIsPlayer(unit) then
+		local _, c = UnitClass(unit)
+		coords = c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
 	end
+	if coords then
+		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+	else
+		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
+		if unit and not UnitIsPlayer(unit) and name then npcIcons[name] = ns:CreatureIcon(unit) end
+		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
+		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+	d.classIcon:Show()
 	local min, max = d.health:GetMinMaxValues()
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
@@ -269,7 +283,6 @@ local function UpdatePlate(plate, d)
 
 	-- auras: exact from the game when the player is your target/focus/mouseover/arena unit,
 	-- otherwise from the combat-log tracker (matched by name)
-	local unit = name and PlateUnit(name, isTarget, arena)
 	local guid = unit and UnitGUID(unit) or (name and ns.nameToGUID[name])
 	local anchorTop = friendly and d.hp or d.name
 	LayoutAuras(d, anchorTop, friendly, guid, unit)

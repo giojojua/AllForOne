@@ -149,17 +149,18 @@ end
 
 local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 
--- Class icon for a unit: shown for players, hidden for NPCs
+-- Icon for a unit: class icon for players, creature-type icon for everything else
 local function PaintClassIcon(icon, unit)
 	local class = U.IsPlayer(unit) and U.Class(unit)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if coords then
 		icon.tex:SetTexture(CLASS_TEX)
 		icon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
-		icon:Show()
 	else
-		icon:Hide()
+		icon.tex:SetTexture(ns:CreatureIcon(unit))
+		icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	end
+	icon:Show()
 end
 
 ----------------------------------------------------------------------
