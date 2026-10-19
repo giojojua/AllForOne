@@ -248,40 +248,24 @@ local specList = {
 ----------------------------------------------------------------------
 -- Procs shown next to your character
 ----------------------------------------------------------------------
-local procList = {
-	44544,  -- Fingers of Frost
-	57761,  -- Brain Freeze ("Fireball!")
-	48108,  -- Hot Streak
-	44401,  -- Missile Barrage
-	69369,  -- Predator's Swiftness
-	48517,  -- Eclipse (Solar)
-	48518,  -- Eclipse (Lunar)
-	16870,  -- Clearcasting (Omen of Clarity)
-	17941,  -- Shadow Trance (Nightfall)
-	34936,  -- Backlash
-	71165,  -- Molten Core
-	63167,  -- Decimation
-	54277,  -- Backdraft
-	59578,  -- The Art of War
-	54149,  -- Infusion of Light
-	53817,  -- Maelstrom Weapon
-	53390,  -- Tidal Waves
-	33151,  -- Surge of Light
-	63735,  -- Serendipity
-	52437,  -- Sudden Death
-	46916,  -- Bloodsurge ("Slam!")
-	60503,  -- Taste for Blood
-	50227,  -- Sword and Board
-	51124,  -- Killing Machine
-	59052,  -- Freezing Fog (Rime)
-	56453,  -- Lock and Load
-	53220,  -- Improved Steady Shot
+-- Proc suggestions shown in the /afo procs window (nothing is tracked until you add it)
+local procSuggestions = {
+	MAGE = { 44544, 57761, 48108, 44401 },            -- Fingers of Frost, Brain Freeze, Hot Streak, Missile Barrage
+	DRUID = { 69369, 48517, 48518, 16870 },           -- Predator's Swiftness, Eclipse (Solar/Lunar), Clearcasting
+	WARLOCK = { 17941, 34936, 71165, 63167, 54277 },  -- Shadow Trance, Backlash, Molten Core, Decimation, Backdraft
+	PALADIN = { 59578, 54149 },                       -- The Art of War, Infusion of Light
+	SHAMAN = { 53817, 53390, 16246 },                 -- Maelstrom Weapon, Tidal Waves, Clearcasting
+	PRIEST = { 33151, 63735, 59888 },                 -- Surge of Light, Serendipity, Borrowed Time
+	WARRIOR = { 52437, 46916, 60503, 50227 },         -- Sudden Death, Bloodsurge, Taste for Blood, Sword and Board
+	DEATHKNIGHT = { 51124, 59052 },                   -- Killing Machine, Freezing Fog
+	HUNTER = { 56453, 53220 },                        -- Lock and Load, Improved Steady Shot
+	ROGUE = {},
 }
 
 ----------------------------------------------------------------------
 -- Build name-keyed lookups (runs at login, when spell names are known)
 ----------------------------------------------------------------------
-ns.CC, ns.CD, ns.Racial, ns.Spec, ns.Proc, ns.Trinket, ns.Resets = {}, {}, {}, {}, {}, {}, {}
+ns.CC, ns.CD, ns.Racial, ns.Spec, ns.ProcSuggest, ns.Trinket, ns.Resets = {}, {}, {}, {}, {}, {}, {}
 ns.classCooldowns = {}  -- class -> ordered list of cooldown records
 
 local function Info(id)
@@ -322,9 +306,13 @@ ns:Listen("LOGIN", function()
 			end
 		end
 	end
-	for _, id in ipairs(procList) do
-		local name = Info(id)
-		if name then ns.Proc[name] = true end
+	for class, ids in pairs(procSuggestions) do
+		local list = {}
+		for _, id in ipairs(ids) do
+			local name, icon = Info(id)
+			if name then list[#list + 1] = { name = name, icon = icon, id = id } end
+		end
+		ns.ProcSuggest[class] = list
 	end
 	for _, e in ipairs(resetList) do
 		local name = Info(e[1])

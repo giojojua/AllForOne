@@ -23,13 +23,13 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mouse wheel to resize (50–200%), right-click to put that part back. Type `/afo lock` to finish. Positions are saved per character; `/afo reset` restores the default layout. Moving only works out of combat (a game rule), and combat ends move mode automatically.
 
 ### Choose which procs to show
-Procs appear as glowing icons next to your character. There's a default list for every class; change it with:
-- `/afo procs` – show the list
-- `/afo procs add Hot Streak` or `/afo procs add 48108` – track a buff by name or spell ID
-- `/afo procs remove Clearcasting` – stop tracking one
-- `/afo procs reset` – back to the defaults
+Procs appear as glowing icons next to your character. Nothing is tracked until you pick it: type `/afo procs` to open the proc window.
+- **Add box:** type a buff name or spell ID and press Enter.
+- **Tracked:** your list, with × to remove.
+- **Suggested for your class:** common procs for your class, + to add.
+- **Your buffs right now:** whatever is on you this moment, + to add (handy when a proc pops and you don't know its exact name).
 
-The name must match the buff's name exactly as it appears in game (capital letters don't matter).
+Your list is saved for your account. Commands also work: `/afo procs add <name or ID>`, `/afo procs remove <name or ID>`, `/afo procs reset` (clears the list).
 
 ### Commands
 | Command | What it does |
@@ -37,7 +37,7 @@ The name must match the buff's name exactly as it appears in game (capital lette
 | `/afo unlock` / `/afo lock` | Move mode on / off |
 | `/afo reset` | Put every part back to the default layout |
 | `/afo test` | Toggle sample data on every frame |
-| `/afo procs` | List / add / remove tracked procs |
+| `/afo procs` | Open the proc window |
 | `/afo scale 0.9` | Resize the whole UI (0.5–2) |
 | `/afo colors` | Class-colored bars on/off |
 | `/afo menu 0.4` | Idle opacity of bags + menu (0–1) |
