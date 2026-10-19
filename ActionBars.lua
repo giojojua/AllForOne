@@ -41,6 +41,9 @@ local function SkinButton(b)
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		icon:ClearAllPoints()
 		icon:SetAllPoints(b)
+		-- Blizzard puts the spell icon on the BACKGROUND layer, the same layer as our
+		-- dark button fill below, which then covered it. Lift the icon above the fill.
+		icon:SetDrawLayer("ARTWORK")
 	end
 	for _, suffix in ipairs({ "NormalTexture", "NormalTexture2", "FloatingBG" }) do
 		local t = _G[name .. suffix]
@@ -191,6 +194,40 @@ local function Reanchor()
 	end)
 end
 
+-- Blizzard bar artwork that would otherwise travel along with the bars we move
+local ART = {
+	"MainMenuBarTexture0", "MainMenuBarTexture1", "MainMenuBarTexture2", "MainMenuBarTexture3",
+	"MainMenuBarLeftEndCap", "MainMenuBarRightEndCap", "MainMenuBarPageNumber",
+	"BonusActionBarTexture0", "BonusActionBarTexture1",
+	"ShapeshiftBarLeft", "ShapeshiftBarMiddle", "ShapeshiftBarRight",
+	"SlidingActionBarTexture0", "SlidingActionBarTexture1",
+	"PossessBackground1", "PossessBackground2",
+}
+
+local function HideBlizzardBar()
+	-- the whole default bar: gryphons, page arrows, XP/rep bars, micro menu, bag buttons
+	MainMenuBar:SetParent(ns.hider)
+	MainMenuBar:Hide()
+	for _, name in ipairs({ "ActionBarUpButton", "ActionBarDownButton", "MainMenuExpBar",
+		"MainMenuBarMaxLevelBar", "ReputationWatchBar", "ExhaustionTick" }) do
+		local f = _G[name]
+		if f then f:SetParent(ns.hider) end
+	end
+	for _, name in ipairs(ART) do
+		local t = _G[name]
+		if t then
+			t:SetTexture(nil)
+			t:SetAlpha(0)
+		end
+	end
+end
+
+-- run each step on its own: if one fails, the rest still happen and the error is reported
+local function Step(fn)
+	local ok, err = pcall(fn)
+	if not ok then ns:Report(err) end
+end
+
 local function Build()
 	-- three middle rows: bar 1 at the bottom (30px up, the XP bar goes under), bar 2, then bar 3 on top
 	local rowW = 12 * STEP - GAP
@@ -206,66 +243,76 @@ local function Build()
 	local stance = Holder("AFOStanceBar", "STANCES / FORMS", smallW, 30, "BOTTOM", -(rowW - smallW) / 2, above)
 	local pet = Holder("AFOPetBar", "PET BAR", smallW, 30, "BOTTOM", (rowW - smallW) / 2, above)
 
-	-- make sure all four extra bars are turned on
-	SHOW_MULTI_ACTIONBAR_1, SHOW_MULTI_ACTIONBAR_2, SHOW_MULTI_ACTIONBAR_3, SHOW_MULTI_ACTIONBAR_4 = "1", "1", "1", "1"
-	ALWAYS_SHOW_MULTIBARS = "1"
-	SetActionBarToggles(1, 1, 1, 1, 1)
-	if MultiActionBar_Update then MultiActionBar_Update() end
-
-	Row("ActionButton", main, false, true)
-	BonusActionBarFrame:SetParent(main)
-	BonusActionBarFrame:SetFrameLevel(main:GetFrameLevel() + 4)
-	Row("BonusActionButton", main)
-	-- while a stance page is up, the stance buttons cover the normal ones
-	BonusActionBarFrame:HookScript("OnShow", function()
-		for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(0) end
+	-- 1. main bar buttons out of the Blizzard bar, then hide the Blizzard bar
+	Step(function() Row("ActionButton", main, false, true) end)
+	Step(function()
+		MultiBarBottomLeft:SetParent(bar2)
+		MultiBarBottomRight:SetParent(bar3)
+		MultiBarRight:SetParent(right1)
+		MultiBarLeft:SetParent(right2)
+		BonusActionBarFrame:SetParent(main)
+		BonusActionBarFrame:SetFrameLevel(main:GetFrameLevel() + 4)
+		ShapeshiftBarFrame:SetParent(stance)
+		if PossessBarFrame then PossessBarFrame:SetParent(stance) end
+		PetActionBarFrame:SetParent(pet)
 	end)
-	BonusActionBarFrame:HookScript("OnHide", function()
-		for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(1) end
+	Step(HideBlizzardBar)
+
+	-- 2. turn on all four extra bars
+	Step(function()
+		SHOW_MULTI_ACTIONBAR_1, SHOW_MULTI_ACTIONBAR_2, SHOW_MULTI_ACTIONBAR_3, SHOW_MULTI_ACTIONBAR_4 = "1", "1", "1", "1"
+		ALWAYS_SHOW_MULTIBARS = "1"
+		SetActionBarToggles(1, 1, 1, 1, 1)
+		if MultiActionBar_Update then MultiActionBar_Update() end
 	end)
-	if BonusActionBarFrame:IsShown() then
-		for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(0) end
-	end
 
-	MultiBarBottomLeft:SetParent(bar2)
-	Row("MultiBarBottomLeftButton", bar2)
-	MultiBarBottomRight:SetParent(bar3)
-	Row("MultiBarBottomRightButton", bar3)
-	MultiBarRight:SetParent(right1)
-	Row("MultiBarRightButton", right1, true)
-	MultiBarLeft:SetParent(right2)
-	Row("MultiBarLeftButton", right2, true)
-
-	ShapeshiftBarFrame:SetParent(stance)
-	if PossessBarFrame then PossessBarFrame:SetParent(stance) end
-	PetActionBarFrame:SetParent(pet)
-
-	-- keep Blizzard from moving bars back
-	if UIPARENT_MANAGED_FRAME_POSITIONS then
-		for _, n in ipairs({ "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight", "MultiBarLeft",
-			"ShapeshiftBarFrame", "PossessBarFrame", "PetActionBarFrame", "MainMenuBar" }) do
-			UIPARENT_MANAGED_FRAME_POSITIONS[n] = nil
+	-- 3. lay out and restyle the buttons
+	Step(function()
+		Row("BonusActionButton", main)
+		-- while a stance page is up, the stance buttons cover the normal ones
+		BonusActionBarFrame:HookScript("OnShow", function()
+			for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(0) end
+		end)
+		BonusActionBarFrame:HookScript("OnHide", function()
+			for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(1) end
+		end)
+		if BonusActionBarFrame:IsShown() then
+			for i = 1, 12 do _G["ActionButton" .. i]:SetAlpha(0) end
 		end
-	end
-	hooksecurefunc("UIParent_ManageFramePositions", Reanchor)
-	if ShapeshiftBar_Update then hooksecurefunc("ShapeshiftBar_Update", Reanchor) end
-	if PetActionBar_Update then hooksecurefunc("PetActionBar_Update", Reanchor) end
-	Reanchor()
-
-	-- the old bar art, XP bars, micro menu and bag buttons go away (replaced in HUD.lua)
-	MainMenuBar:SetParent(ns.hider)
-
-	hooksecurefunc("ActionButton_UpdateHotkeys", function(self)
-		local hk = _G[self:GetName() .. "HotKey"]
-		if hk then hk:SetText(Shorten(hk:GetText())) end
 	end)
-	for _, prefix in ipairs({ "ActionButton", "BonusActionButton", "MultiBarBottomLeftButton",
-		"MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton" }) do
-		for i = 1, 12 do
-			local b = _G[prefix .. i]
-			if b and ActionButton_UpdateHotkeys then ActionButton_UpdateHotkeys(b, b.buttonType) end
+	Step(function() Row("MultiBarBottomLeftButton", bar2) end)
+	Step(function() Row("MultiBarBottomRightButton", bar3) end)
+	Step(function() Row("MultiBarRightButton", right1, true) end)
+	Step(function() Row("MultiBarLeftButton", right2, true) end)
+
+	-- 4. keep Blizzard from moving bars back
+	Step(function()
+		if UIPARENT_MANAGED_FRAME_POSITIONS then
+			for _, n in ipairs({ "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight", "MultiBarLeft",
+				"ShapeshiftBarFrame", "PossessBarFrame", "PetActionBarFrame", "MainMenuBar" }) do
+				UIPARENT_MANAGED_FRAME_POSITIONS[n] = nil
+			end
 		end
-	end
+		hooksecurefunc("UIParent_ManageFramePositions", Reanchor)
+		if ShapeshiftBar_Update then hooksecurefunc("ShapeshiftBar_Update", Reanchor) end
+		if PetActionBar_Update then hooksecurefunc("PetActionBar_Update", Reanchor) end
+	end)
+	Step(Reanchor)
+
+	-- 5. short keybind labels
+	Step(function()
+		hooksecurefunc("ActionButton_UpdateHotkeys", function(self)
+			local hk = _G[self:GetName() .. "HotKey"]
+			if hk then hk:SetText(Shorten(hk:GetText())) end
+		end)
+		for _, prefix in ipairs({ "ActionButton", "BonusActionButton", "MultiBarBottomLeftButton",
+			"MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton" }) do
+			for i = 1, 12 do
+				local b = _G[prefix .. i]
+				if b and ActionButton_UpdateHotkeys then ActionButton_UpdateHotkeys(b, b.buttonType) end
+			end
+		end
+	end)
 end
 
 ns:Listen("LOGIN", function()

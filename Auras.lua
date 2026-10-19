@@ -17,6 +17,7 @@ local function SkinAura(button, isDebuff)
 	if icon then
 		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		icon:SetAllPoints(button)
+		icon:SetDrawLayer("ARTWORK") -- above our outline/border, which share its old layer
 	end
 	local outline = button:CreateTexture(nil, "BACKGROUND")
 	outline:SetTexture(0, 0, 0, 1)
