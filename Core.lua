@@ -18,10 +18,14 @@ function ns:On(event, fn)
 	list[#list + 1] = fn
 end
 
+-- each handler runs on its own: one error can't stop the others (errors are still shown)
 eventFrame:SetScript("OnEvent", function(_, event, ...)
 	local list = handlers[event]
 	if list then
-		for i = 1, #list do list[i](event, ...) end
+		for i = 1, #list do
+			local ok, err = pcall(list[i], event, ...)
+			if not ok then ns:Report(err) end
+		end
 	end
 end)
 
@@ -206,10 +210,24 @@ ns:On("ADDON_LOADED", function(_, name)
 	end
 end)
 
-ns:On("PLAYER_LOGIN", function()
+-- Build the UI. After a /reload in combat the game locks protected frames (unit frames,
+-- action bars, hiding Blizzard's frames), so in that case wait until combat ends.
+ns.loaded = false
+local function Start()
+	if ns.loaded then return end
+	ns.loaded = true
 	ns:UpdateScale()
-	HideBlizzardUnitFrames()
+	local ok, err = pcall(HideBlizzardUnitFrames)
+	if not ok then ns:Report(err) end
 	ns:Send("LOGIN")
+	ns:Send("REFRESH_ALL")
+end
+
+ns:On("PLAYER_LOGIN", function()
+	if InCombatLockdown() then
+		ns:Print("you're in combat - the UI will load as soon as combat ends")
+	end
+	ns:SafeCall(Start)
 end)
 
 ns:On("UI_SCALE_CHANGED", function() ns:UpdateScale() end)
@@ -243,7 +261,7 @@ SlashCmdList.ALLFORONE = function(msg)
 	local raw = strtrim(msg or "")
 	local first, rawArg = strsplit(" ", raw, 2)
 	if strlower(first or "") == "procs" then
-		ns:ProcCommand(rawArg)
+		if ns.ProcCommand then ns:ProcCommand(rawArg) else ns:Print("the proc window needs a full game restart after updating the addon") end
 		return
 	end
 	local cmd, arg = strsplit(" ", strlower(raw), 2)

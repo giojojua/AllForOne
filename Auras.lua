@@ -295,9 +295,9 @@ local function ScanPlayer()
 	for i = 1, 40 do
 		local name, _, icon, count, _, duration, expires = UnitAura("player", i, "HELPFUL")
 		if not name then break end
-		if ns:IsProc(name) then
+		if ns.IsProc and ns:IsProc(name) then
 			procs[#procs + 1] = { name = name, icon = icon, count = count, dur = duration, expires = expires }
-			ns:RememberProcIcon(name, icon)
+			if ns.RememberProcIcon then ns:RememberProcIcon(name, icon) end
 		end
 	end
 	ns:ShowProcs(procs)
