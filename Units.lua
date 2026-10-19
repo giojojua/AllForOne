@@ -407,6 +407,13 @@ function Target:UpdatePower()
 	self.power:SetValue(cur or 0)
 end
 
+-- Combo pips sit above the right end of the health bar, in the same band as the debuff row
+local function ComboShown()
+	if ns.testing then return true end
+	local _, class = UnitClass("player")
+	return class == "ROGUE" or class == "DRUID" or GetComboPoints("player", "target") > 0
+end
+
 function Target:UpdateAuras()
 	local debuffs, buffs = {}, {}
 	if ns.testing then
@@ -436,8 +443,10 @@ function Target:UpdateAuras()
 		if (a.cc and 1 or 0) ~= (b.cc and 1 or 0) then return a.cc and true or false end
 		return (a.expires or 1e9) < (b.expires or 1e9)
 	end)
+	-- 8 debuffs fit above the frame; only 5 when combo points take the right end
+	local maxDebuffs = ComboShown() and 5 or #self.debuffs
 	for i, icon in ipairs(self.debuffs) do
-		local a = debuffs[i]
+		local a = i <= maxDebuffs and debuffs[i] or nil
 		if a then
 			icon:Set(a.icon, a.count, a.dur, a.expires)
 			if a.cc and not a.mine then icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3]) else icon:SetBorder() end
@@ -458,8 +467,7 @@ end
 
 function Target:UpdateCombo()
 	local points = ns.testing and (ns.fakeCombo or 0) or GetComboPoints("player", "target")
-	local _, class = UnitClass("player")
-	local show = ns.testing or points > 0 or class == "ROGUE" or class == "DRUID"
+	local show = ComboShown()
 	for i, pip in ipairs(self.pips) do
 		if show then
 			pip:Show()
@@ -672,7 +680,9 @@ end)
 ns:On("PLAYER_TARGET_CHANGED", function() ForUnit("target", "Update"); ForUnit("targettarget", "Update"); ns:RefreshAll() end)
 ns:On("PLAYER_FOCUS_CHANGED", function() ForUnit("focus", "Update") end)
 ns:On("UNIT_TARGET", function(_, unit) if unit == "target" then ForUnit("targettarget", "Update") end end)
-ns:On("UNIT_COMBO_POINTS", function() if ns.frames.target then ns.frames.target:UpdateCombo() end end)
+ns:On("UNIT_COMBO_POINTS", function()
+	if ns.frames.target then ns.frames.target:UpdateCombo(); ns.frames.target:UpdateAuras() end
+end)
 ns:On("PARTY_MEMBERS_CHANGED", function() ns:RefreshAll() end)
 ns:On("ARENA_OPPONENT_UPDATE", function(_, unit) if unit then ForUnit(unit, "Update") end end)
 

@@ -66,6 +66,24 @@ end
 ns:Listen("LOGIN", function()
 	SetCVar("consolidateBuffs", "0")
 	SetCVar("buffDurations", "1")
+	-- cap your own auras at 2 rows of buffs and 1 row of debuffs,
+	-- so a fully buffed character never grows down into the enemy arena frames
+	local MAX_BUFFS, MAX_DEBUFFS = 16, 8
+	BUFF_MAX_DISPLAY = MAX_BUFFS
+	DEBUFF_MAX_DISPLAY = MAX_DEBUFFS
+	if BuffFrame_Update then
+		hooksecurefunc("BuffFrame_Update", function()
+			for i = MAX_BUFFS + 1, 32 do
+				local b = _G["BuffButton" .. i]
+				if b then b:Hide() end
+			end
+			for i = MAX_DEBUFFS + 1, 16 do
+				local b = _G["DebuffButton" .. i]
+				if b then b:Hide() end
+			end
+		end)
+		BuffFrame_Update()
+	end
 	hooksecurefunc("AuraButton_Update", function(buttonName, index, filter)
 		SkinAura(_G[buttonName .. index], filter == "HARMFUL")
 	end)
