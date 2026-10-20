@@ -513,6 +513,95 @@ end
 ----------------------------------------------------------------------
 -- Chat: outlined text, no button clutter, tabs fade out
 ----------------------------------------------------------------------
+-- Thin scroll bar on the right edge of a chat window (3.3.5 chat only has hidden up/down
+-- buttons). Drag it, click the track, or keep using the mouse wheel; the little arrow at the
+-- bottom jumps back to the newest line.
+local function ChatScrollBar(cf)
+	if cf.afoScroll then return end
+	local bar = CreateFrame("Slider", nil, cf)
+	bar:SetOrientation("VERTICAL")
+	bar:SetWidth(6)
+	bar:SetPoint("TOPLEFT", cf, "TOPRIGHT", 6, 0)
+	bar:SetPoint("BOTTOMLEFT", cf, "BOTTOMRIGHT", 6, 14)
+	ns:Skin(bar)
+	bar.fill:SetTexture(0, 0, 0, 0.35)
+	local thumb = bar:CreateTexture(nil, "OVERLAY")
+	thumb:SetTexture(colors.muted[1], colors.muted[2], colors.muted[3], 0.9)
+	thumb:SetSize(6, 30)
+	bar:SetThumbTexture(thumb)
+	bar:SetValueStep(1)
+	bar:SetMinMaxValues(0, 0)
+	bar:SetValue(0)
+
+	local bottom = CreateFrame("Button", nil, cf)
+	bottom:SetSize(12, 12)
+	bottom:SetPoint("TOP", bar, "BOTTOM", 0, -2)
+	ns:Skin(bottom)
+	bottom.text = ns:CreateText(bottom, 10, true, "CENTER")
+	bottom.text:SetPoint("CENTER", 0, 0)
+	bottom.text:SetText("v")
+	bottom:SetScript("OnClick", function() cf:ScrollToBottom() end)
+	bottom:Hide()
+
+	local function Lines()
+		local n = cf.GetNumLinesDisplayed and cf:GetNumLinesDisplayed()
+		if n and n > 0 then return n end
+		local _, size = cf:GetFont()
+		return math.max(1, floor((cf:GetHeight() or 100) / ((size or 14) + 2)))
+	end
+	local function Max()
+		return math.max(0, (cf:GetNumMessages() or 0) - Lines())
+	end
+
+	local updating = false
+	local function Sync()
+		local max = Max()
+		local scroll = cf:GetCurrentScroll() or 0
+		updating = true
+		bar:SetMinMaxValues(0, max)
+		bar:SetValue(max - scroll)
+		updating = false
+		-- thumb size follows how much of the history is visible
+		local h = bar:GetHeight() or 100
+		local total = math.max(1, cf:GetNumMessages() or 1)
+		thumb:SetHeight(math.max(16, math.min(h, h * Lines() / total)))
+		if max == 0 then bar:SetAlpha(0.25) else bar:SetAlpha(1) end
+		if scroll > 0 then bottom:Show() else bottom:Hide() end
+	end
+
+	bar:SetScript("OnValueChanged", function(_, value)
+		if updating then return end
+		local want = floor(Max() - value + 0.5)
+		if cf.SetScrollOffset then
+			cf:SetScrollOffset(want)
+		else
+			-- older clients: step there line by line (bounded)
+			for _ = 1, 2000 do
+				local now = cf:GetCurrentScroll() or 0
+				if now < want then cf:ScrollUp() elseif now > want then cf:ScrollDown() else break end
+				if (cf:GetCurrentScroll() or 0) == now then break end -- reached the end
+			end
+		end
+		Sync()
+	end)
+	bar:EnableMouseWheel(true)
+	bar:SetScript("OnMouseWheel", function(_, delta)
+		if delta > 0 then cf:ScrollUp() else cf:ScrollDown() end
+		Sync()
+	end)
+
+	-- follow new messages / wheel scrolling
+	local acc = 0
+	bar:SetScript("OnUpdate", function(_, e)
+		acc = acc + e
+		if acc < 0.15 then return end
+		acc = 0
+		Sync()
+	end)
+	cf.afoScroll = bar
+	Sync()
+end
+
 local function SetupChat()
 	for _, name in ipairs({ "ChatFrameMenuButton", "FriendsMicroButton", "ChatFrame1ButtonFrame" }) do
 		if _G[name] then ns:Kill(_G[name]) end
@@ -525,6 +614,8 @@ local function SetupChat()
 			cf:SetShadowOffset(0, 0)
 			local bf = _G["ChatFrame" .. i .. "ButtonFrame"]
 			if bf then ns:Kill(bf) end
+			local ok, err = pcall(ChatScrollBar, cf)
+			if not ok then ns:Report(err) end
 		end
 	end
 	CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA = 0
