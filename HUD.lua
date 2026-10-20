@@ -187,7 +187,7 @@ function ns:MinimapButtons(holder)
 	row[#row + 1] = map
 
 	for i, b in ipairs(row) do
-		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 24, -5)
+		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 24, -15)
 	end
 	ns.minimapButtons = row
 end
