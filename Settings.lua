@@ -2,7 +2,10 @@
 local _, ns = ...
 local colors = ns.colors
 
-local W, PAD = 420, 18
+-- two columns: LOOK + ARENA on the left; parts, layout and profiles on the right
+local PAD = 18
+local CW = 384                 -- column width
+local W = 2 * CW + 3 * PAD     -- window width
 local win
 
 ----------------------------------------------------------------------
@@ -30,7 +33,7 @@ end
 -- checkbox: get() returns the current value, set(v) stores it
 local function Check(parent, label, note, get, set)
 	local c = CreateFrame("Button", nil, parent)
-	c:SetSize(W - 2 * PAD, 22)
+	c:SetSize(CW, 22)
 	c.box = CreateFrame("Frame", nil, c)
 	c.box:SetSize(16, 16)
 	c.box:SetPoint("LEFT", 0, 0)
@@ -56,7 +59,7 @@ end
 -- slider: min/max/step, fmt(v) for the value label
 local function Slider(parent, label, min, max, step, fmt, get, set)
 	local f = CreateFrame("Frame", nil, parent)
-	f:SetSize(W - 2 * PAD, 34)
+	f:SetSize(CW, 34)
 	f.label = Text(f, 14, true)
 	f.label:SetPoint("TOPLEFT", 0, 0)
 	f.label:SetText(label)
@@ -64,7 +67,7 @@ local function Slider(parent, label, min, max, step, fmt, get, set)
 	f.value:SetPoint("TOPRIGHT", 0, 0)
 	local s = CreateFrame("Slider", nil, f)
 	s:SetOrientation("HORIZONTAL")
-	s:SetSize(W - 2 * PAD, 10)
+	s:SetSize(CW, 10)
 	s:SetPoint("BOTTOMLEFT", 0, 2)
 	ns:Skin(s)
 	local thumb = s:CreateTexture(nil, "OVERLAY")
@@ -128,9 +131,11 @@ local function Build()
 	close:SetPoint("TOPRIGHT", -PAD + 4, -PAD + 4)
 
 	local y = 64
+	local colX = PAD
+	local leftBottom = 0
 	local function Add(widget, h)
 		widget:ClearAllPoints()
-		widget:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -y)
+		widget:SetPoint("TOPLEFT", win, "TOPLEFT", colX, -y)
 		y = y + (h or widget:GetHeight()) + 8
 		if widget.Refresh then controls[#controls + 1] = widget end
 		return widget
@@ -164,8 +169,25 @@ local function Build()
 	Add(Check(win, "Announce kill target in party chat", nil,
 		function() return ns.db.announceKill ~= false end,
 		function(v) ns.db.announceKill = v end))
+	Add(Check(win, "Arena analyzer", "records your last 50 arenas",
+		function() return ns.db.analyzerOn ~= false end,
+		function(v) ns.db.analyzerOn = v end))
+	Add(Check(win, "Report popup after each arena", nil,
+		function() return ns.db.analyzerPopup ~= false end,
+		function(v) ns.db.analyzerPopup = v end))
+	local arenaRow = CreateFrame("Frame", nil, win)
+	arenaRow:SetSize(CW, 26)
+	local openAnalyzer = Button(arenaRow, "OPEN ANALYZER", (CW - 16) / 3, function()
+		win:Hide()
+		if ns.Analyzer and ns.Analyzer.Open then ns.Analyzer:Open() end
+	end)
+	openAnalyzer:SetPoint("LEFT", 0, 0)
+	Add(arenaRow, 26)
 
-	y = y + 6
+	-- second column
+	leftBottom = y
+	y = 64
+	colX = PAD + CW + PAD
 	Add(Header(win, "PARTS OF THE UI  (take effect after a reload)"), 14)
 	for _, m in ipairs({ { "nameplates", "Nameplates" }, { "raid", "Raid frames (battlegrounds, raids)" }, { "actionbars", "Action bars, bags, menu, XP bar" },
 		{ "minimap", "Minimap" }, { "chat", "Chat cleanup" } }) do
@@ -175,8 +197,8 @@ local function Build()
 	y = y + 6
 	Add(Header(win, "LAYOUT AND TOOLS"), 14)
 	local row1 = CreateFrame("Frame", nil, win)
-	row1:SetSize(W - 2 * PAD, 26)
-	local bw = (W - 2 * PAD - 16) / 3
+	row1:SetSize(CW, 26)
+	local bw = (CW - 16) / 3
 	local unlock = Button(row1, "MOVE / RESIZE", bw, function() win:Hide(); ns:Unlock() end)
 	unlock:SetPoint("LEFT", 0, 0)
 	local reset = Button(row1, "RESET LAYOUT", bw, function() ns:ResetLayout() end)
@@ -185,7 +207,7 @@ local function Build()
 	test:SetPoint("LEFT", reset, "RIGHT", 8, 0)
 	Add(row1, 26)
 	local row2 = CreateFrame("Frame", nil, win)
-	row2:SetSize(W - 2 * PAD, 26)
+	row2:SetSize(CW, 26)
 	local procs = Button(row2, "CHOOSE PROCS", bw, function()
 		win:Hide()
 		if ns.ToggleProcWindow then ns:ToggleProcWindow() end
@@ -203,9 +225,9 @@ local function Build()
 	y = y + 6
 	Add(Header(win, "PROFILES  (layout + settings, shared by all your characters)"), 14)
 	local saveRow = CreateFrame("Frame", nil, win)
-	saveRow:SetSize(W - 2 * PAD, 26)
+	saveRow:SetSize(CW, 26)
 	local box = CreateFrame("EditBox", nil, saveRow)
-	box:SetSize(W - 2 * PAD - bw - 8, 26)
+	box:SetSize(CW - bw - 8, 26)
 	box:SetPoint("LEFT", 0, 0)
 	box:SetAutoFocus(false)
 	box:SetMaxLetters(32)
@@ -235,15 +257,15 @@ local function Build()
 	local MAX_ROWS = 6
 	local rows = {}
 	local empty = Text(win, 13, false, colors.muted)
-	empty:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -listTop - 4)
+	empty:SetPoint("TOPLEFT", win, "TOPLEFT", colX, -listTop - 4)
 	empty:SetText("No profiles yet. Set the UI up the way you like, name it, and save.")
 	local more = Text(win, 12, false, colors.muted)
 
 	local function Row(i)
 		if rows[i] then return rows[i] end
 		local r = CreateFrame("Frame", nil, win)
-		r:SetSize(W - 2 * PAD, 24)
-		r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -(listTop + (i - 1) * 28))
+		r:SetSize(CW, 24)
+		r:SetPoint("TOPLEFT", win, "TOPLEFT", colX, -(listTop + (i - 1) * 28))
 		r.name = Text(r, 14, true)
 		r.name:SetPoint("LEFT", 0, 0)
 		r.info = Text(r, 12, false, colors.muted)
@@ -297,14 +319,14 @@ local function Build()
 		if #list == 0 then empty:Show() else empty:Hide() end
 		if #list > MAX_ROWS then
 			more:ClearAllPoints()
-			more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -(listTop + shown * 28))
+			more:SetPoint("TOPLEFT", win, "TOPLEFT", colX, -(listTop + shown * 28))
 			more:SetText((#list - MAX_ROWS) .. " more - /afo profile list")
 			more:Show()
 		else
 			more:Hide()
 		end
 		local listH = (#list == 0) and 22 or (shown * 28 + (#list > MAX_ROWS and 18 or 0))
-		win:SetHeight(listTop + listH + PAD)
+		win:SetHeight(math.max(leftBottom, listTop + listH) + PAD)
 	end
 
 	win:SetScript("OnShow", function()

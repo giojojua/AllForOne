@@ -35,6 +35,32 @@ Marks one enemy **KILL** (red tag next to their frame and on their nameplate) an
 - Turn the helper or the announcements off in `/afo` settings (ARENA).
 - It's a strong hint, not an order: it can't see positioning or line of sight, and the enemy spec is only known once they cast something spec-specific.
 
+### Arena analyzer
+Every arena you play is recorded from the combat log. When the match ends a small popup shows the result and how many notes there are; **OPEN REPORT** (or `/afo analyze`) opens the full report. Your **last 50 arenas** are kept; older ones are deleted automatically.
+
+**The report**
+- **Notes** — likely mistakes, most important first:
+  - trinket used with no crowd control, on a root/silence/disarm, or with under 1.5s left
+  - sat in a long crowd control with your trinket ready while a teammate was under 30%
+  - died with your trinket or a life-saving defensive ready (Ice Block, Divine Shield, Cloak, Evasion, Pain Suppression, Shield Wall, Deterrence...)
+  - big defensive used above 70% health with little damage coming in
+  - interrupts that missed (dodged, or the target wasn't casting)
+  - interrupted on long casts you started while their interrupt was ready
+  - your crowd control wasted (immune from diminishing returns, reflected, grounded), landed at a quarter duration, broken early by your own team, or overlapping a teammate's
+  - out of your healer's range for a large part of the fight (or, as a healer, teammates out of yours)
+  - little of your damage on the marked kill target
+- **Deaths** — who died when, first death, and for your team a recap of the 10 seconds before: damage by spell and source, crowd control on them / your healer, cooldowns they used.
+- **Stats** — crowd control on you (by type) and yours; trinket and defensive timings; interrupts (landed on heals / crowd control / damage, how far into the cast); damage done per target and on the kill target, damage taken by spell, biggest 3-second burst on you; healing and overhealing; dispels and purges; range.
+- **Enemies** — per enemy: died / died first, how fast they went down, trinketed (early?), defensives used or died with one unused, time crowd-controlled.
+- **Timeline** — gates, trinkets, defensives, interrupts, deaths.
+- **Trends (last 50)** — win rate, record against each enemy comp, average time crowd-controlled, interrupt success, and mistakes that repeat in your last 10 games.
+
+**Enemy history** — the analyzer remembers what each enemy player did in your stored matches (died first, wasted trinket, died with defensives up, used defensives early). Once you've faced someone twice, the kill target helper gives them a bonus and shows why (`died first 3/4`), and a note appears under known enemies (`faced 5× · died first 4×`). Newer games count more; since it's built from the stored 50 matches, it ages out with them.
+
+`/afo analyze test` shows a sample report; `/afo analyze reset` (twice) deletes the history. Settings: ARENA → *Arena analyzer* and *Report popup after each arena*.
+
+Limits: only what the combat log shows within about 50 yards; no line of sight or positioning; notes are hints, not a grade.
+
 ### Battlegrounds
 - **Raid frames:** in a battleground (or any raid) the party rows on the left hide and a compact grid takes their place under your own frame: one column per group, class-colored health, the most important debuff on each player (crowd control first, then anything you can dispel), a white ring on your target, faded when out of range. Left-click targets, right-click opens the usual raid menu. Move it as "RAID / BATTLEGROUND"; turn it off in `/afo` settings.
 - **Flag carriers (Warsong Gulch, Eye of the Storm):** two rows under the minimap: **EFC** (enemy carrying your flag) and **FFC** (your carrier) with class color, health when known (raid member, or an enemy you target/focus/mouse over) and how long they've held it. Click a row to target that carrier. WoW doesn't let addons change click targets during combat, so if a carrier changes mid-fight, the click updates once you leave combat.
@@ -71,6 +97,7 @@ Your list is saved for your account. Commands also work: `/afo procs add <name o
 | `/afo` | Open the settings window |
 | `/afo help` | List every command |
 | `/afo profile save/load/delete <name>`, `/afo profile list` | Save and switch versions of your UI |
+| `/afo analyze` | Arena analyzer (last 50 matches); `test` = sample report, `reset` = delete history |
 | `/afo unlock` / `/afo lock` | Move mode on / off |
 | `/afo reset` | Put every part back to the default layout |
 | `/afo test` | Toggle sample arena data on every frame |

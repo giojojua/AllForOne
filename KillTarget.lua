@@ -90,6 +90,8 @@ local function Read(e)
 	e.guid = U.GUID(u)
 	e.class = U.Class(u)
 	e.name = U.Name(u) or ("arena" .. e.n)
+	e.full = (not ns.testing and ns.FullName and ns:FullName(u)) or e.name
+	e.history = ns.EnemyHistory and ns:EnemyHistory(e.full) or nil
 	e.spec = e.guid and ns.specs[e.guid]
 	e.healer = e.spec and HEALER_SPECS[e.spec] or false
 	local cur, max = U.Health(u)
@@ -151,6 +153,11 @@ local function Score(e, enemies)
 		if o ~= e and o.healer and o.ccd then s = s + 15; reasons[#reasons + 1] = "healer CC'd" break end
 	end
 	if e.healer and e.drinking then s = s + 30; reasons[#reasons + 1] = "drinking" end
+	-- what you've seen from this player in your last 50 arenas (arena analyzer)
+	if e.history then
+		s = s + e.history.bonus
+		if e.history.reason then reasons[#reasons + 1] = e.history.reason end
+	end
 	if e.reduce > 0 then s = s - e.reduce end
 	if e.immune then s = s - 1000 end
 	if #reasons == 0 then reasons[1] = e.healer and "healer" or "fewest defensives" end
@@ -293,6 +300,13 @@ local function Update()
 			ShowTag(row, "CC", "healer · your kill target is low")
 		else
 			ShowTag(row, nil)
+			-- known player: a short note from past games
+			local e
+			for _, x in ipairs(enemies) do if x.unit == u then e = x end end
+			if e and e.history then
+				local t = Tag(row)
+				t.why:SetText(format("faced %d× · died first %d×", e.history.games, e.history.diedFirst))
+			end
 		end
 	end
 end

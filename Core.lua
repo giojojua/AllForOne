@@ -86,6 +86,8 @@ ns.defaults = {
 	macroNames = true,      -- macro names on action buttons
 	killHelper = true,      -- arena kill target helper (KILL / CC markers)
 	announceKill = true,    -- announce kill target changes in party chat
+	analyzerOn = true,      -- record arena matches (last 50)
+	analyzerPopup = true,   -- small report popup after each arena
 	usableColors = true,    -- tint action buttons: red out of range, blue no power
 	nameplates = true,
 	raid = true,            -- raid frames in battlegrounds / raids
@@ -291,6 +293,10 @@ SlashCmdList.ALLFORONE = function(msg)
 		if ns.ProcCommand then ns:ProcCommand(rawArg) else ns:Print("the proc window needs a full game restart after updating the addon") end
 		return
 	end
+	if strlower(first or "") == "analyze" or strlower(first or "") == "analyzer" then
+		if ns.AnalyzeCommand then ns:AnalyzeCommand(rawArg) else ns:Print("the analyzer needs a full game restart after updating the addon") end
+		return
+	end
 	if strlower(first or "") == "profile" or strlower(first or "") == "profiles" then
 		if ns.ProfileCommand then ns:ProfileCommand(rawArg) else ns:Print("profiles need a full game restart after updating the addon") end
 		return
@@ -332,6 +338,7 @@ SlashCmdList.ALLFORONE = function(msg)
 		ns:Print("/afo test - show every frame with sample arena data; /afo test bg - sample battleground")
 		ns:Print("/afo procs - open the proc window (choose which procs show next to your character)")
 		ns:Print("/afo profile save|load|delete <name>, /afo profile list - save and switch whole UI versions")
+		ns:Print("/afo analyze - arena analyzer (last 50 matches); /afo analyze test - sample report; /afo analyze reset - delete history")
 		ns:Print("/afo scale 0.9 - resize the whole UI at once")
 		ns:Print("/afo colors - class-colored bars on/off")
 		ns:Print("/afo menu 0.6 - idle opacity of bags and menu (0-1)")
