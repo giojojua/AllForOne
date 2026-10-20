@@ -314,8 +314,9 @@ local function UpdatePlate(plate, d)
 			d.wasTargetFont = isTarget
 			ns:Font(d.hpText, isTarget and 11 or 10, true)
 		end
-		-- kill target helper: KILL / CC next to the arena number
-		local mark = (name and name == ns.killName and "|cffe5484dKILL|r") or (name and name == ns.ccName and "|cff3d9bffCC|r") or nil
+		-- kill target helper: red cross (KILL) / blue square (CC) next to the arena number
+		local icon = (name and name == ns.killName and ns.KILL_ICON) or (name and name == ns.ccName and ns.CC_ICON) or nil
+		local mark = icon and ("|T" .. icon .. ":16|t") or nil
 		local num = arena and tostring(arena) or ""
 		d.num:SetText(mark and (num ~= "" and (mark .. " " .. num) or mark) or num)
 		if d.wasTarget ~= isTarget then

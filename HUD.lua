@@ -514,9 +514,9 @@ local function SetupChat()
 end
 
 ----------------------------------------------------------------------
--- Arena: map + bracket + match timer (top center), big gates countdown
+-- Arena: map + bracket + match timer + players alive (top center); gates countdown inside the bar
 ----------------------------------------------------------------------
-local status, countdown
+local status
 local matchStart, gatesAt
 
 local COUNTDOWN_MSGS = {
@@ -549,17 +549,6 @@ local function SetupArena()
 	status.alive:SetPoint("LEFT", status.time, "RIGHT", 18, 0)
 	status:Hide()
 
-	countdown = CreateFrame("Frame", nil, ns.root)
-	countdown:SetSize(400, 120)
-	ns:Mover("countdown", "GATES COUNTDOWN", countdown, "TOP", "TOP", 0, -112)
-	countdown.label = ns:CreateText(countdown, 16, true, "CENTER")
-	countdown.label:SetPoint("TOP")
-	countdown.label:SetText("GATES OPEN IN")
-	countdown.label:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	countdown.time = ns:CreateText(countdown, 88, true, "CENTER")
-	countdown.time:SetPoint("TOP", countdown.label, "BOTTOM", 0, -4)
-	countdown:Hide()
-
 	-- runs on its own frame: in battlegrounds the arena timer is hidden but the countdown isn't
 	local driver = CreateFrame("Frame")
 	local acc = 0
@@ -568,13 +557,18 @@ local function SetupArena()
 		if acc < 0.2 then return end
 		acc = 0
 		local now = GetTime()
+		-- one countdown only, inside the bar (no second big number on screen)
+		local _, kind = IsInInstance()
 		if gatesAt and gatesAt > now then
 			local left = ceil(gatesAt - now)
-			countdown.time:SetText(format("%d:%02d", floor(left / 60), left % 60))
-			countdown:Show()
-			status.time:SetText("PREP")
+			status.time:SetText(format("|cfff2b33dGATES %d:%02d|r", floor(left / 60), left % 60))
+			if kind == "pvp" and not status:IsShown() then
+				status.map:SetText(strupper(GetRealZoneText() or ""))
+				status:Show()
+			end
 		else
-			countdown:Hide()
+			-- battlegrounds: the bar is only there for the gates countdown
+			if kind == "pvp" and status:IsShown() and not ns.testing then status:Hide() end
 			if gatesAt and not matchStart then matchStart = gatesAt end
 			if matchStart then
 				local t = now - matchStart
@@ -613,12 +607,13 @@ local function ArenaZone()
 		status.map:SetText(strupper((GetRealZoneText() or "") .. "  " .. Bracket()))
 		status:Show()
 	else
-		status:Hide()
 		-- keep a battleground's gates countdown running; anywhere else, clear it
 		local _, kind = IsInInstance()
 		if kind ~= "pvp" then
-			countdown:Hide()
+			status:Hide()
 			matchStart, gatesAt = nil, nil
+		elseif not (gatesAt and gatesAt > GetTime()) then
+			status:Hide()
 		end
 	end
 end

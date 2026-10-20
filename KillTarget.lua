@@ -167,33 +167,42 @@ end
 ----------------------------------------------------------------------
 -- Markers on the enemy frames + nameplates
 ----------------------------------------------------------------------
-local tags = {}
-local function Tag(row)
-	if tags[row] then return tags[row] end
-	local t = CreateFrame("Frame", nil, row)
-	t:SetSize(58, 20)
-	t:SetPoint("TOPLEFT", row, "TOPRIGHT", 6, 0)
-	ns:Skin(t)
-	t.text = ns:CreateText(t, 13, true, "CENTER")
-	t.text:SetPoint("CENTER", 0, 0)
-	t.why = ns:CreateText(row, 11, true, "LEFT")
-	t.why:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -3)
-	t.why:SetWidth(170)
-	t.why:SetJustifyV("TOP")
-	t.why:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	t:Hide()
-	tags[row] = t
-	return t
+-- A raid-marker style sign on the enemy's health bar: red cross = KILL, blue square = CC.
+-- Switching the kill target simply moves the cross. Hover the frame to see why.
+local KILL_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_7" -- red cross
+local CC_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_6"   -- blue square
+ns.KILL_ICON, ns.CC_ICON = KILL_ICON, CC_ICON
+
+local marks = {}
+local function Mark(row)
+	if marks[row] then return marks[row] end
+	local holder = CreateFrame("Frame", nil, row.health or row)
+	holder:SetAllPoints(row.health or row)
+	holder:SetFrameLevel((row.health or row):GetFrameLevel() + 3)
+	local m = holder:CreateTexture(nil, "OVERLAY")
+	m:SetSize(26, 26)
+	m:SetPoint("CENTER", holder, "CENTER", 0, 0)
+	m:Hide()
+	m.holder = holder
+	marks[row] = m
+	-- the reasons go in the frame's tooltip
+	row:HookScript("OnEnter", function(self)
+		if self.killWhy and self.killWhy ~= "" and GameTooltip:IsOwned(self) then
+			GameTooltip:AddLine(" ")
+			GameTooltip:AddLine(self.killKind and ("|T" .. (self.killKind == "CC" and CC_ICON or KILL_ICON) .. ":14|t " .. self.killKind) or "AllForOne", 1, 1, 1)
+			GameTooltip:AddLine(self.killWhy, 0.75, 0.76, 0.78, true)
+			GameTooltip:Show()
+		end
+	end)
+	return m
 end
 
-local function ShowTag(row, kind, why)
-	local t = Tag(row)
-	if not kind then t:Hide(); t.why:SetText(""); return end
-	local c = (kind == "CC" and colors.dispel.Magic) or (kind == "SWITCH" and colors.kick) or colors.danger
-	t.fill:SetTexture(c[1], c[2], c[3], 1)
-	t.text:SetText(kind)
-	t.why:SetText(why or "")
-	t:Show()
+local function ShowMark(row, kind, why)
+	local m = Mark(row)
+	row.killWhy, row.killKind = why, kind
+	if not kind then m:Hide() return end
+	m:SetTexture(kind == "CC" and CC_ICON or KILL_ICON)
+	m:Show()
 end
 
 ----------------------------------------------------------------------
@@ -245,7 +254,7 @@ local function Clear(full)
 	killUnit, ccUnit = nil, nil
 	if full then announced = nil end
 	ns.killName, ns.ccName = nil, nil
-	for _, t in pairs(tags) do t:Hide(); t.why:SetText("") end
+	for row, m in pairs(marks) do m:Hide(); row.killWhy = nil end
 end
 
 local function Update()
@@ -293,20 +302,16 @@ local function Update()
 	for i, row in ipairs(ns.frames.arena) do
 		local u = "arena" .. i
 		if pick and u == pick.unit then
-			local why = table.concat(pick.reasons, " · ")
-			local switching = announced and pick.guid ~= announced
-			ShowTag(row, switching and "SWITCH" or "KILL", swapReason and ("swap: " .. swapReason) or why)
+			ShowMark(row, "KILL", swapReason and ("swap: " .. swapReason) or table.concat(pick.reasons, " · "))
 		elseif cc and u == cc.unit then
-			ShowTag(row, "CC", "healer · your kill target is low")
+			ShowMark(row, "CC", "healer · your kill target is low")
 		else
-			ShowTag(row, nil)
-			-- known player: a short note from past games
-			local e
-			for _, x in ipairs(enemies) do if x.unit == u then e = x end end
-			if e and e.history then
-				local t = Tag(row)
-				t.why:SetText(format("faced %d× · died first %d×", e.history.games, e.history.diedFirst))
+			-- known player: a note from past games, in the tooltip
+			local note
+			for _, x in ipairs(enemies) do
+				if x.unit == u and x.history then note = format("faced %d× · died first %d×", x.history.games, x.history.diedFirst) end
 			end
+			ShowMark(row, nil, note)
 		end
 	end
 end

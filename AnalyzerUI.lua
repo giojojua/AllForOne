@@ -222,19 +222,53 @@ local function Button(parent, label, w, onClick)
 	return b
 end
 
+-- A scroll area with a thin scroll bar on its right edge (drag it, click the track,
+-- or use the mouse wheel anywhere over the area).
+local BAR_W = 8
 local function Scroll(parent, w, h)
 	local sf = CreateFrame("ScrollFrame", nil, parent)
-	sf:SetSize(w, h)
+	sf:SetSize(w - BAR_W - 6, h)
 	local child = CreateFrame("Frame", nil, sf)
-	child:SetSize(w, 10)
+	child:SetSize(w - BAR_W - 6, 10)
 	sf:SetScrollChild(child)
-	sf:EnableMouseWheel(true)
-	sf:SetScript("OnMouseWheel", function(self, delta)
+
+	local bar = CreateFrame("Slider", nil, parent)
+	bar:SetOrientation("VERTICAL")
+	bar:SetWidth(BAR_W)
+	bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 6, 0)
+	bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 6, 0)
+	ns:Skin(bar)
+	local thumb = bar:CreateTexture(nil, "OVERLAY")
+	thumb:SetTexture(colors.muted[1], colors.muted[2], colors.muted[3], 1)
+	thumb:SetSize(BAR_W, 40)
+	bar:SetThumbTexture(thumb)
+	bar:SetValueStep(1)
+	bar:SetMinMaxValues(0, 0)
+	bar:SetValue(0)
+	bar:EnableMouseWheel(true)
+	bar:SetScript("OnValueChanged", function(_, v) sf:SetVerticalScroll(v) end)
+
+	-- range + thumb size follow the content height
+	function sf:UpdateBar()
 		local max = math.max(0, child:GetHeight() - self:GetHeight())
-		local v = math.max(0, math.min(max, self:GetVerticalScroll() - delta * 40))
+		bar:SetMinMaxValues(0, max)
+		thumb:SetHeight(math.max(24, h * h / math.max(h, child:GetHeight())))
+		if max == 0 then bar:Hide() else bar:Show() end
+		if bar:GetValue() > max then bar:SetValue(max) end
+	end
+	function sf:ScrollTo(v)
+		bar:SetValue(v)
 		self:SetVerticalScroll(v)
-	end)
-	sf.child = child
+	end
+	local function Wheel(_, delta)
+		local _, max = bar:GetMinMaxValues()
+		local v = math.max(0, math.min(max, bar:GetValue() - delta * 40))
+		bar:SetValue(v)
+	end
+	sf:EnableMouseWheel(true)
+	sf:SetScript("OnMouseWheel", Wheel)
+	bar:SetScript("OnMouseWheel", Wheel)
+	sf.child, sf.bar = child, bar
 	return sf
 end
 
@@ -243,7 +277,7 @@ local function ShowReport(m)
 	local child = content.child
 	local width = child:GetWidth()
 	for _, fs in ipairs(lines) do fs:Hide() end
-	if not m then content:SetVerticalScroll(0) return end
+	if not m then content:UpdateBar(); content:ScrollTo(0) return end
 	local y = 0
 	local i = 0
 	for _, l in ipairs(A:ReportLines(m)) do
@@ -274,7 +308,8 @@ local function ShowReport(m)
 		end
 	end
 	child:SetHeight(y + 10)
-	content:SetVerticalScroll(0)
+	content:UpdateBar()
+	content:ScrollTo(0)
 	for _, b in ipairs(listButtons) do
 		if b.match == m then b.fill:SetTexture(0.16, 0.17, 0.19, 1) else b.fill:SetTexture(colors.bg[1], colors.bg[2], colors.bg[3], 1) end
 	end
@@ -291,7 +326,7 @@ local function FillList(extra)
 		local b = listButtons[i]
 		if not b then
 			b = CreateFrame("Button", nil, child)
-			b:SetSize(LIST_W - 8, 40)
+			b:SetSize(LIST_W - BAR_W - 8, 40)
 			ns:Skin(b)
 			b.top = ns:CreateText(b, 13, true, "LEFT")
 			b.top:SetPoint("TOPLEFT", 6, -5)
@@ -312,6 +347,7 @@ local function FillList(extra)
 		b:Show()
 	end
 	child:SetHeight(math.max(10, #matches * 44))
+	list:UpdateBar()
 	return matches
 end
 
@@ -345,12 +381,12 @@ local function Build()
 	list = Scroll(win, LIST_W, H - top - PAD)
 	list:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -top)
 	content = Scroll(win, W - LIST_W - 3 * PAD, H - top - PAD)
-	content:SetPoint("TOPLEFT", list, "TOPRIGHT", PAD, 0)
-	content.child:SetWidth(W - LIST_W - 3 * PAD - 8)
+	content:SetPoint("TOPLEFT", list, "TOPRIGHT", PAD + BAR_W + 6, 0)
+	content.child:SetWidth(W - LIST_W - 3 * PAD - BAR_W - 6)
 
 	win.empty = ns:CreateText(content.child, 14, false, "LEFT")
 	win.empty:SetPoint("TOPLEFT", 0, 0)
-	win.empty:SetWidth(W - LIST_W - 3 * PAD - 8)
+	win.empty:SetWidth(W - LIST_W - 3 * PAD - BAR_W - 6)
 	win.empty:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
 	win.empty:SetText("No arenas recorded yet. Play an arena match and the report shows up here.\n\n/afo analyze test shows a sample report.")
 	win:Hide()
