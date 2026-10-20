@@ -322,6 +322,22 @@ ns:On("ADDON_LOADED", function(_, name)
 end)
 
 ----------------------------------------------------------------------
+-- Red error text ("Not enough rage", "Out of range", "Spell is not ready yet") on/off.
+-- Only the error event is switched off: yellow information (quest progress, "joined the
+-- queue", battleground messages) comes through a different event and keeps showing.
+----------------------------------------------------------------------
+function ns:ApplyErrorFilter()
+	if not UIErrorsFrame then return end
+	if ns.db.hideErrors then
+		UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
+	else
+		UIErrorsFrame:RegisterEvent("UI_ERROR_MESSAGE")
+	end
+end
+ns:Listen("LOGIN", function() ns:ApplyErrorFilter() end)
+ns:Listen("REFRESH_ALL", function() ns:ApplyErrorFilter() end) -- e.g. after loading a profile
+
+----------------------------------------------------------------------
 -- Bags (top row) + game menu (bottom row), bottom-right, faded until hovered
 ----------------------------------------------------------------------
 -- { tooltip name, binding, icon, action } — icons are stock 3.3.5 textures

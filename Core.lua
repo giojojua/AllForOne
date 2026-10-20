@@ -97,6 +97,7 @@ ns.defaults = {
 	analyzerOn = true,      -- record arena matches (last 50)
 	analyzerPopup = true,   -- small report popup after each arena
 	usableColors = true,    -- tint action buttons: red out of range, blue no power
+	hideErrors = false,     -- hide the red error text ("Not enough rage"...); yellow info stays
 	nameplates = true,
 	raid = true,            -- raid frames in battlegrounds / raids
 	actionbars = true,
