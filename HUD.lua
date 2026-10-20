@@ -106,8 +106,10 @@ local function SetupMinimap()
 
 	if not first then return end
 	Step(function() ns:MinimapButtons(holder) end)
-	local info = ns:CreateText(holder, 13, true, "RIGHT")
-	info:SetPoint("TOPRIGHT", Minimap, "BOTTOMRIGHT", 0, -6)
+	-- clock + latency on the same row as the small buttons, right-aligned and vertically
+	-- centered on them (the buttons take the left ~86px, the text the rest)
+	local info = ns:CreateText(holder, 12, true, "RIGHT")
+	info:SetPoint("RIGHT", Minimap, "BOTTOMRIGHT", 0, -25)
 	info:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
 	local t = CreateFrame("Frame")
 	local acc = 1
@@ -116,7 +118,7 @@ local function SetupMinimap()
 		if acc < 1 then return end
 		acc = 0
 		local _, _, latency = GetNetStats()
-		info:SetText(date("%H:%M") .. " · " .. (latency or 0) .. " ms")
+		info:SetText(date("%H:%M") .. "  " .. (latency or 0) .. "ms")
 		local n = Minimap:GetNumChildren()
 		if n ~= t.children then t.children = n; pcall(RaiseIcons); if ns.ScanAddonButtons then pcall(ns.ScanAddonButtons) end end
 	end)
@@ -189,7 +191,7 @@ function ns:MinimapButtons(holder)
 	row[#row + 1] = ns:AddonDrawer(holder)
 
 	for i, b in ipairs(row) do
-		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 24, -15)
+		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 22, -15)
 	end
 	ns.minimapButtons = row
 end
