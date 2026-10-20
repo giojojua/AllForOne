@@ -84,6 +84,8 @@ ns.defaults = {
 	classColoredBars = true, -- false = dark bars with class-colored names
 	menuAlpha = 0.6,        -- idle opacity of bags + game menu
 	macroNames = true,      -- macro names on action buttons
+	killHelper = true,      -- arena kill target helper (KILL / CC markers)
+	announceKill = true,    -- announce kill target changes in party chat
 	usableColors = true,    -- tint action buttons: red out of range, blue no power
 	nameplates = true,
 	raid = true,            -- raid frames in battlegrounds / raids

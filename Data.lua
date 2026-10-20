@@ -106,6 +106,7 @@ local cdList = {
 		{ 64382, 300 },       -- Shattering Throw
 		{ 18499, 30 },        -- Berserker Rage
 		{ 20252, 15 },        -- Intercept
+		{ 871, 300 },         -- Shield Wall
 	},
 	PALADIN = {
 		{ 642, 300, true },   -- Divine Shield
@@ -116,6 +117,7 @@ local cdList = {
 		{ 20066, 60 },        -- Repentance
 		{ 31821, 120 },       -- Aura Mastery
 		{ 31884, 180 },       -- Avenging Wrath
+		{ 498, 180 },         -- Divine Protection
 	},
 	HUNTER = {
 		{ 19503, 30, true },  -- Scatter Shot
