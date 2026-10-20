@@ -39,17 +39,33 @@ local shiftX = 0 -- sideways nudge so the score lines are centered on the holder
 local function PlaceScore()
 	if placing or not scoreHolder or not WorldStateAlwaysUpFrame then return end
 	placing = true
-	WorldStateAlwaysUpFrame:SetParent(scoreHolder)
+	if WorldStateAlwaysUpFrame:GetParent() ~= scoreHolder then WorldStateAlwaysUpFrame:SetParent(scoreHolder) end
 	WorldStateAlwaysUpFrame:ClearAllPoints()
 	WorldStateAlwaysUpFrame:SetPoint("TOP", scoreHolder, "TOP", shiftX, 0)
 	placing = false
 end
 
+-- In arenas Blizzard's score only says "Gold Team: 3 Players Remaining", which the arena
+-- timer bar already shows (3 v 3) — so it's hidden there instead of overlapping the bar.
+local function ScoreVisibility()
+	if not scoreHolder then return end
+	if ns:InArena() then scoreHolder:Hide() else scoreHolder:Show() end
+end
+
 -- Blizzard lines the score rows up from a fixed left edge, so with our font the block sits
 -- off-center. Measure the visible rows (icon to end of text) and shift the whole block so its
 -- middle is the holder's middle.
+local lastSignature
 local function CenterScore()
-	if not scoreHolder or not WorldStateAlwaysUpFrame then return end
+	if not scoreHolder or not WorldStateAlwaysUpFrame or not scoreHolder:IsShown() then return end
+	-- only re-center when the text actually changed (Blizzard refreshes this a lot)
+	local sig = ""
+	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 0) do
+		local text = _G["AlwaysUpFrame" .. i .. "Text"]
+		local row = _G["AlwaysUpFrame" .. i]
+		if row and row:IsShown() and text then sig = sig .. "|" .. (text:GetText() or "") end
+	end
+	if sig == lastSignature then return end
 	local left, right
 	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 0) do
 		local row = _G["AlwaysUpFrame" .. i]
@@ -67,10 +83,11 @@ local function CenterScore()
 	end
 	local cx = scoreHolder:GetCenter()
 	if not left or not cx then return end
+	lastSignature = sig
 	-- rows are children of the moved frame, so they share the holder's scale
 	local delta = cx - (left + right) / 2
 	if math.abs(delta) > 0.5 then
-		shiftX = shiftX + delta
+		shiftX = math.max(-300, math.min(300, shiftX + delta))
 		PlaceScore()
 	end
 end
@@ -107,7 +124,10 @@ local function SetupScore()
 	end
 	StyleScore()
 	-- re-center when the holder is moved or resized in move mode
-	ns:Listen("LAYOUT_CHANGED", function(key) if key == "bgscore" then centerer:Show() end end)
+	ns:Listen("LAYOUT_CHANGED", function(key) if key == "bgscore" then lastSignature = nil; centerer:Show() end end)
+	ScoreVisibility()
+	ns:On("PLAYER_ENTERING_WORLD", ScoreVisibility)
+	ns:On("ZONE_CHANGED_NEW_AREA", ScoreVisibility)
 end
 
 ----------------------------------------------------------------------

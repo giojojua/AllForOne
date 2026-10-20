@@ -58,18 +58,26 @@ function ns:Send(msg, ...)
 end
 
 -- Run fn now, or after combat if we are in combat lockdown.
-local pending = {}
+-- The same function is queued only once, however often it's asked for during combat
+-- (some Blizzard updates fire many times a second), and each one runs protected.
+local pending, queued = {}, {}
 function ns:SafeCall(fn)
 	if InCombatLockdown() then
-		pending[#pending + 1] = fn
+		if not queued[fn] then
+			queued[fn] = true
+			pending[#pending + 1] = fn
+		end
 	else
 		fn()
 	end
 end
 ns:On("PLAYER_REGEN_ENABLED", function()
 	local list = pending
-	pending = {}
-	for i = 1, #list do list[i]() end
+	pending, queued = {}, {}
+	for i = 1, #list do
+		local ok, err = pcall(list[i])
+		if not ok then ns:Report(err) end
+	end
 end)
 
 function ns:Print(...)
