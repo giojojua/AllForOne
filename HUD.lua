@@ -118,7 +118,7 @@ local function SetupMinimap()
 		local _, _, latency = GetNetStats()
 		info:SetText(date("%H:%M") .. " · " .. (latency or 0) .. " ms")
 		local n = Minimap:GetNumChildren()
-		if n ~= t.children then t.children = n; pcall(RaiseIcons) end
+		if n ~= t.children then t.children = n; pcall(RaiseIcons); if ns.ScanAddonButtons then pcall(ns.ScanAddonButtons) end end
 	end)
 	ns:Send("MINIMAP_PLACED")
 end
@@ -186,10 +186,130 @@ function ns:MinimapButtons(holder)
 	map.icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
 	row[#row + 1] = map
 
+	row[#row + 1] = ns:AddonDrawer(holder)
+
 	for i, b in ipairs(row) do
 		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 24, -15)
 	end
 	ns.minimapButtons = row
+end
+
+----------------------------------------------------------------------
+-- Addon drawer: one button under the map; click it for a dropdown holding every other
+-- addon's minimap button (LibDBIcon and the like), so the square map stays clean.
+----------------------------------------------------------------------
+-- Blizzard's own minimap pieces (and ours) are never collected
+local BLIZZARD = {
+	MiniMapBattlefieldFrame = true, MiniMapLFGFrame = true, MiniMapMailFrame = true, MiniMapInstanceDifficulty = true,
+	MinimapBackdrop = true, MiniMapTracking = true, MiniMapTrackingButton = true, MinimapZoomIn = true, MinimapZoomOut = true,
+	MiniMapWorldMapButton = true, MiniMapVoiceChatFrame = true, GameTimeFrame = true, TimeManagerClockButton = true,
+	MinimapPing = true, MiniMapPing = true, MinimapZoneTextButton = true, MinimapToggleButton = true,
+	MiniMapCompassRing = true, MinimapNorthTag = true, MiniMapRecordingButton = true,
+}
+
+local drawer, drawerButton
+local collected, order = {}, {}
+local placing = false
+local COLS, CELL = 5, 30
+
+local function LayoutDrawer()
+	if not drawer then return end
+	placing = true
+	for i, b in ipairs(order) do
+		local col, r = (i - 1) % COLS, floor((i - 1) / COLS)
+		b:ClearAllPoints()
+		b:SetPoint("CENTER", drawer, "TOPLEFT", 6 + col * CELL + CELL / 2, -6 - r * CELL - CELL / 2)
+	end
+	placing = false
+	local rows = math.max(1, ceil(#order / COLS))
+	drawer:SetSize(12 + math.max(1, math.min(#order, COLS)) * CELL, 12 + rows * CELL)
+	if #order == 0 then drawer.empty:Show() else drawer.empty:Hide() end
+	drawerButton.count:SetText(#order > 0 and #order or "")
+end
+
+local function IsAddonButton(f)
+	if not f or collected[f] or f == drawer then return false end
+	local name = f.GetName and f:GetName()
+	if not name or BLIZZARD[name] or name:find("^AllForOne") then return false end
+	local kind = f.GetObjectType and f:GetObjectType()
+	if kind ~= "Button" and not (f.HasScript and f:HasScript("OnClick") and f:GetScript("OnClick")) then return false end
+	local w, h = f:GetWidth(), f:GetHeight()
+	return w and h and w > 0 and w <= 48 and h <= 48
+end
+
+local function Collect(f)
+	collected[f] = true
+	order[#order + 1] = f
+	f:SetParent(drawer)
+	f:SetFrameStrata("DIALOG")
+	f:SetFrameLevel(drawer:GetFrameLevel() + 2)
+	-- they live in the drawer now: no dragging them around the map
+	if f.RegisterForDrag then f:RegisterForDrag() end
+	f:SetScript("OnDragStart", nil)
+	f:SetScript("OnDragStop", nil)
+	-- addons (LibDBIcon) re-anchor their button to the map now and then: put it back
+	hooksecurefunc(f, "SetPoint", function() if not placing then LayoutDrawer() end end)
+	if f.Show then f:Show() end
+end
+
+local function Scan()
+	if not drawer then return end
+	local found = false
+	for _, parent in ipairs({ Minimap, MinimapBackdrop, MinimapCluster }) do
+		if parent and parent.GetChildren then
+			for _, child in ipairs({ parent:GetChildren() }) do
+				if IsAddonButton(child) then
+					local ok = pcall(Collect, child)
+					if ok then found = true end
+				end
+			end
+		end
+	end
+	if found then
+		table.sort(order, function(a, b) return (a:GetName() or "") < (b:GetName() or "") end)
+	end
+	LayoutDrawer()
+end
+ns.ScanAddonButtons = Scan
+
+function ns:AddonDrawer(holder)
+	drawerButton = MapButton(holder, "Addon buttons", function()
+		Scan()
+		if drawer:IsShown() then drawer:Hide() else drawer:Show() end
+	end)
+	drawerButton.icon:SetTexture("Interface\\Icons\\INV_Misc_Gear_02")
+	drawerButton.count = ns:CreateText(drawerButton, 10, true, "RIGHT")
+	drawerButton.count:SetPoint("BOTTOMRIGHT", 2, -2)
+
+	drawer = CreateFrame("Frame", "AllForOneAddonDrawer", holder)
+	drawer:SetFrameStrata("DIALOG")
+	-- opens under the button row, lined up with the map so it never runs off the screen edge
+	drawer:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", 0, -39)
+	drawer:SetSize(12 + CELL, 12 + CELL)
+	drawer:EnableMouse(true)
+	ns:Skin(drawer)
+	drawer.fill:SetTexture(0.04, 0.045, 0.05, 0.96)
+	drawer.empty = ns:CreateText(drawer, 12, false, "LEFT")
+	drawer.empty:SetPoint("TOPLEFT", 8, -10)
+	drawer.empty:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+	drawer.empty:SetText("No addon buttons")
+	drawer:Hide()
+	tinsert(UISpecialFrames, "AllForOneAddonDrawer") -- Esc closes it
+
+	-- addons create their buttons at different times: look again after login and loading screens
+	local t = CreateFrame("Frame")
+	local acc, tries = 0, 0
+	t:SetScript("OnUpdate", function(self, e)
+		acc = acc + e
+		if acc < 2 then return end
+		acc = 0
+		tries = tries + 1
+		Scan()
+		if tries >= 5 then self:Hide() end
+	end)
+	ns:On("PLAYER_ENTERING_WORLD", function() Scan() end)
+	ns:On("ADDON_LOADED", function() if drawer then Scan() end end)
+	return drawerButton
 end
 
 -- Blizzard_TimeManager adds its own clock button to the minimap
