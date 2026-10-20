@@ -27,7 +27,7 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 
 ### Battlegrounds
 - **Raid frames:** in a battleground (or any raid) the party rows on the left hide and a compact grid takes their place under your own frame: one column per group, class-colored health, the most important debuff on each player (crowd control first, then anything you can dispel), a white ring on your target, faded when out of range. Left-click targets, right-click opens the usual raid menu. Move it as "RAID / BATTLEGROUND"; turn it off in `/afo` settings.
-- **Flag carriers (Warsong Gulch, Eye of the Storm):** two rows at the top: **EFC** (enemy carrying your flag) and **FFC** (your carrier) with class color, health when known (raid member, or an enemy you target/focus/mouse over) and how long they've held it. Click a row to target that carrier. WoW doesn't let addons change click targets during combat, so if a carrier changes mid-fight, the click updates once you leave combat.
+- **Flag carriers (Warsong Gulch, Eye of the Storm):** two rows under the minimap: **EFC** (enemy carrying your flag) and **FFC** (your carrier) with class color, health when known (raid member, or an enemy you target/focus/mouse over) and how long they've held it. Click a row to target that carrier. WoW doesn't let addons change click targets during combat, so if a carrier changes mid-fight, the click updates once you leave combat.
 - **Score:** Blizzard's battleground score at the top is movable ("BATTLEGROUND SCORE") and uses the UI font.
 - **Capture timers:** bases, towers and graveyards being taken (Arathi Basin, Isle of Conquest: 1 min; Alterac Valley: 4 min) count down under the score in the capturing faction's color.
 - **Gates countdown** also works in battlegrounds.

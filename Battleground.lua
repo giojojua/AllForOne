@@ -173,7 +173,8 @@ end
 local function SetupFlags()
 	flagHolder = CreateFrame("Frame", nil, ns.root)
 	flagHolder:SetSize(200, 48)
-	ns:Mover("flags", "FLAG CARRIERS", flagHolder, "TOP", "TOP", -250, -14)
+	-- under the minimap (and its button row), right edges lined up
+	ns:Mover("flags", "FLAG CARRIERS", flagHolder, "TOPRIGHT", "TOPRIGHT", -24, -232)
 	CreateFlagRow("enemy", 0)
 	CreateFlagRow("friendly", -26)
 	local acc = 0
