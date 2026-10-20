@@ -167,7 +167,7 @@ end
 ----------------------------------------------------------------------
 -- Markers on the enemy frames + nameplates
 ----------------------------------------------------------------------
--- A raid-marker style sign on the enemy's health bar: red cross = KILL, blue square = CC.
+-- A raid-marker style sign on the enemy's health bar, just left of the health %: red cross = KILL, blue square = CC.
 -- Switching the kill target simply moves the cross. Hover the frame to see why.
 local KILL_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_7" -- red cross
 local CC_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_6"   -- blue square
@@ -181,7 +181,12 @@ local function Mark(row)
 	holder:SetFrameLevel((row.health or row):GetFrameLevel() + 3)
 	local m = holder:CreateTexture(nil, "OVERLAY")
 	m:SetSize(26, 26)
-	m:SetPoint("CENTER", holder, "CENTER", 0, 0)
+	-- right next to the health percentage
+	if row.hpText then
+		m:SetPoint("RIGHT", row.hpText, "LEFT", -4, 0)
+	else
+		m:SetPoint("CENTER", holder, "CENTER", 0, 0)
+	end
 	m:Hide()
 	m.holder = holder
 	marks[row] = m
