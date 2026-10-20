@@ -261,12 +261,14 @@ local function AnchorPetBar()
 	end
 end
 
+local function DoReanchor()
+	AnchorSmallBar("ShapeshiftButton", 10, holders.AFOStanceBar)
+	AnchorSmallBar("PossessButton", 2, holders.AFOStanceBar)
+	AnchorPetBar()
+end
+-- one shared function: during combat it's queued once, not once per Blizzard update
 local function Reanchor()
-	ns:SafeCall(function()
-		AnchorSmallBar("ShapeshiftButton", 10, holders.AFOStanceBar)
-		AnchorSmallBar("PossessButton", 2, holders.AFOStanceBar)
-		AnchorPetBar()
-	end)
+	ns:SafeCall(DoReanchor)
 end
 
 -- Blizzard bar artwork that would otherwise travel along with the bars we move

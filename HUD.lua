@@ -544,6 +544,9 @@ local function SetupArena()
 	status.time = ns:CreateText(status, 20, true, "LEFT")
 	status.map:SetPoint("LEFT", 16, 0)
 	status.time:SetPoint("LEFT", status.map, "RIGHT", 18, 0)
+	-- players still alive: yours v theirs (replaces Blizzard's "Gold Team: 3 Players Remaining")
+	status.alive = ns:CreateText(status, 18, true, "LEFT")
+	status.alive:SetPoint("LEFT", status.time, "RIGHT", 18, 0)
 	status:Hide()
 
 	countdown = CreateFrame("Frame", nil, ns.root)
@@ -580,7 +583,26 @@ local function SetupArena()
 				status.time:SetText("--:--")
 			end
 		end
-		local w = status.map:GetStringWidth() + status.time:GetStringWidth() + 50
+		-- alive counts
+		local mine, theirs = 0, 0
+		for _, u in ipairs({ "player", "party1", "party2", "party3", "party4" }) do
+			if UnitExists(u) and not UnitIsDeadOrGhost(u) then mine = mine + 1 end
+		end
+		local seen = 0
+		for i = 1, 5 do
+			local u = "arena" .. i
+			if UnitExists(u) then
+				seen = seen + 1
+				if not UnitIsDeadOrGhost(u) then theirs = theirs + 1 end
+			end
+		end
+		if ns.testing then mine, theirs, seen = 3, 2, 3 end
+		if seen > 0 then
+			status.alive:SetText(format("|cff4dc764%d|r |cff8b8f96v|r |cffe5484d%d|r", mine, theirs))
+		else
+			status.alive:SetText("")
+		end
+		local w = status.map:GetStringWidth() + status.time:GetStringWidth() + status.alive:GetStringWidth() + 68
 		status:SetWidth(w)
 	end)
 end
