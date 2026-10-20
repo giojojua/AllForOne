@@ -23,7 +23,7 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 - **Next to your character:** proc alerts (Fingers of Frost, Hot Streak, Predator's Swiftness, …) and a loss-of-control alert when you are CC'd.
 - **Nameplates:** class colors, arena number, your debuffs, big CC from anyone, combo points; friendly plates are thin and only show dispellable CC. Totems (Tremor, Grounding, Earthbind…) get half-size plates with the totem's icon.
 - **Bottom:** 3 action bars in the middle (bar 1 at the bottom, bar 2 above, bar 3 on top) with the XP/rep bar under them; stance/forms/auras above their left corner and the pet bar above their right corner; 2 vertical bars bottom-right above bags and game menu (faded until hovered). Your Blizzard keybinds keep working.
-- **Top:** arena map, bracket and match timer, big gates countdown; buffs (up to 16) and debuffs (up to 8) next to a square minimap with clock and latency.
+- **Top:** arena map, bracket and match timer, big gates countdown; buffs (up to 16) and debuffs (up to 8) next to a square minimap (mouse wheel zooms) with small tracking, calendar and world map buttons, clock and latency under it. Other addons' minimap buttons stay on the map.
 
 ### Settings
 Type `/afo` to open the settings window (UI size, class-colored bars, menu opacity, font, which parts of the UI are on, move mode, reset, test mode, procs). It's also under **Interface → AddOns → AllForOne**. `/afo help` lists every command.
@@ -58,7 +58,7 @@ Your list is saved for your account. Commands also work: `/afo procs add <name o
 | `/afo procs` | Open the proc window |
 | `/afo scale 0.9` | Resize the whole UI (0.5–2) |
 | `/afo colors` | Class-colored bars on/off |
-| `/afo menu 0.4` | Idle opacity of bags + menu (0–1) |
+| `/afo menu 0.6` | Idle opacity of bags + menu (0–1, default 0.6) |
 | `/afo font` | Bundled font on/off (turn off for Cyrillic or Asian names) |
 | `/afo nameplates`, `actionbars`, `minimap`, `chat` | Turn a module off/on (needs `/reload`) |
 

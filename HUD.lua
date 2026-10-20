@@ -37,7 +37,19 @@ local function SetupMinimap()
 		local f = _G[name]
 		if f then Step(function() f:SetParent(Minimap) end) end
 	end
-	if MinimapBackdrop then Step(function() ns:Kill(MinimapBackdrop) end) end
+	-- other addons' minimap buttons sometimes sit on Blizzard's backdrop: move every frame on it
+	-- (except Blizzard's own buttons we replace) onto the map too
+	local replaced = { MinimapZoomIn = true, MinimapZoomOut = true, MiniMapWorldMapButton = true, MiniMapTracking = true,
+		GameTimeFrame = true, MinimapToggleButton = true, MiniMapVoiceChatFrame = true, MinimapZoneTextButton = true }
+	if MinimapBackdrop then
+		Step(function()
+			for _, child in ipairs({ MinimapBackdrop:GetChildren() }) do
+				local n = child:GetName()
+				if not (n and replaced[n]) then child:SetParent(Minimap) end
+			end
+		end)
+		Step(function() ns:Kill(MinimapBackdrop) end)
+	end
 	for _, name in ipairs({ "MinimapBorder", "MinimapBorderTop", "MinimapNorthTag", "MinimapCompassTexture",
 		"MinimapZoomIn", "MinimapZoomOut", "MiniMapWorldMapButton", "MinimapZoneTextButton", "MinimapToggleButton",
 		"GameTimeFrame", "MiniMapVoiceChatFrame", "MiniMapTracking" }) do
@@ -93,6 +105,7 @@ local function SetupMinimap()
 	end)
 
 	if not first then return end
+	Step(function() ns:MinimapButtons(holder) end)
 	local info = ns:CreateText(holder, 13, true, "RIGHT")
 	info:SetPoint("TOPRIGHT", Minimap, "BOTTOMRIGHT", 0, -6)
 	info:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
@@ -108,6 +121,75 @@ local function SetupMinimap()
 		if n ~= t.children then t.children = n; pcall(RaiseIcons) end
 	end)
 	ns:Send("MINIMAP_PLACED")
+end
+
+-- Our own small square buttons under the map (Blizzard's round ones are hidden):
+-- tracking, calendar (today's date, amber with invites), world map. Mouse wheel on the map zooms.
+local function MapButton(parent, tip, onClick)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(20, 20)
+	ns:Skin(b)
+	b.icon = b:CreateTexture(nil, "ARTWORK")
+	b.icon:SetPoint("TOPLEFT", 1, -1)
+	b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+	b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	b:RegisterForClicks("AnyUp")
+	b:SetScript("OnClick", onClick)
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+		GameTooltip:SetText(tip)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return b
+end
+
+function ns:MinimapButtons(holder)
+	local row = {}
+
+	local tracking = MapButton(holder, "Tracking (click to choose)", function(self)
+		if MiniMapTrackingDropDown then ToggleDropDownMenu(1, nil, MiniMapTrackingDropDown, self, 0, 0) end
+	end)
+	local function TrackingIcon()
+		local tex = GetTrackingTexture and GetTrackingTexture()
+		tracking.icon:SetTexture(tex or "Interface\\Minimap\\Tracking\\None")
+	end
+	TrackingIcon()
+	ns:On("MINIMAP_UPDATE_TRACKING", TrackingIcon)
+	row[#row + 1] = tracking
+
+	local calendar = MapButton(holder, "Calendar", function()
+		if not CalendarFrame and LoadAddOn then LoadAddOn("Blizzard_Calendar") end
+		if Calendar_Toggle then Calendar_Toggle() elseif CalendarFrame then ToggleFrame(CalendarFrame) end
+	end)
+	calendar.icon:SetTexture(0.10, 0.11, 0.12, 1)
+	calendar.day = ns:CreateText(calendar, 12, true, "CENTER")
+	calendar.day:SetPoint("CENTER", 0, 0)
+	local function CalendarState()
+		local day = CalendarGetDate and select(3, CalendarGetDate())
+		calendar.day:SetText(day or "")
+		local invites = CalendarGetNumPendingInvites and CalendarGetNumPendingInvites() or 0
+		if invites > 0 then
+			calendar.day:SetTextColor(colors.kick[1], colors.kick[2], colors.kick[3])
+		else
+			calendar.day:SetTextColor(1, 1, 1)
+		end
+	end
+	CalendarState()
+	ns:On("CALENDAR_UPDATE_PENDING_INVITES", CalendarState)
+	ns:On("PLAYER_ENTERING_WORLD", CalendarState)
+	row[#row + 1] = calendar
+
+	local map = MapButton(holder, "World map", function()
+		if ToggleWorldMap then ToggleWorldMap() elseif WorldMapFrame then ToggleFrame(WorldMapFrame) end
+	end)
+	map.icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
+	row[#row + 1] = map
+
+	for i, b in ipairs(row) do
+		b:SetPoint("TOPLEFT", Minimap, "BOTTOMLEFT", (i - 1) * 24, -5)
+	end
+	ns.minimapButtons = row
 end
 
 -- Blizzard_TimeManager adds its own clock button to the minimap

@@ -82,7 +82,7 @@ end
 ns.defaults = {
 	scale = 1,              -- extra scale on top of the 1080p layout
 	classColoredBars = true, -- false = dark bars with class-colored names
-	menuAlpha = 0.4,        -- idle opacity of bags + game menu
+	menuAlpha = 0.6,        -- idle opacity of bags + game menu
 	nameplates = true,
 	actionbars = true,
 	minimap = true,
@@ -222,6 +222,11 @@ ns:On("ADDON_LOADED", function(_, name)
 	if name == ADDON then
 		AllForOneDB = CopyDefaults(ns.defaults, AllForOneDB or {})
 		ns.db = AllForOneDB
+		-- one-time: the default menu opacity went from 40% to 60%; move people still on the old default
+		if not ns.db.menuAlpha60 then
+			if math.abs((ns.db.menuAlpha or 0) - 0.4) < 0.001 then ns.db.menuAlpha = 0.6 end
+			ns.db.menuAlpha60 = true
+		end
 	elseif name == "Blizzard_ArenaUI" and ArenaEnemyFrames then
 		ns:Kill(ArenaEnemyFrames)
 	end
@@ -324,7 +329,7 @@ SlashCmdList.ALLFORONE = function(msg)
 		ns:Print("/afo profile save|load|delete <name>, /afo profile list - save and switch whole UI versions")
 		ns:Print("/afo scale 0.9 - resize the whole UI at once")
 		ns:Print("/afo colors - class-colored bars on/off")
-		ns:Print("/afo menu 0.4 - idle opacity of bags and menu (0-1)")
+		ns:Print("/afo menu 0.6 - idle opacity of bags and menu (0-1)")
 		ns:Print("/afo font - bundled font on/off (off for Cyrillic/Asian names)")
 		ns:Print("/afo nameplates | actionbars | minimap | chat - turn a module on/off")
 	end
