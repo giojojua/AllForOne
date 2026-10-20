@@ -290,7 +290,10 @@ local function UpdatePlate(plate, d)
 		d.num:SetText("")
 	else
 		d.name:SetText(name or "")
-		d.num:SetText(arena and tostring(arena) or "")
+		-- kill target helper: KILL / CC next to the arena number
+		local mark = (name and name == ns.killName and "|cffe5484dKILL|r") or (name and name == ns.ccName and "|cff3d9bffCC|r") or nil
+		local num = arena and tostring(arena) or ""
+		d.num:SetText(mark and (num ~= "" and (mark .. " " .. num) or mark) or num)
 		if d.wasTarget ~= isTarget then
 			d.wasTarget = isTarget
 			ns:Font(d.name, isTarget and 14 or 13, true)

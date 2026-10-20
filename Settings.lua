@@ -157,6 +157,15 @@ local function Build()
 		function(v) ns.db.useFont = v end))
 
 	y = y + 6
+	Add(Header(win, "ARENA"), 14)
+	Add(Check(win, "Kill target helper", "KILL / CC marks on enemies",
+		function() return ns.db.killHelper ~= false end,
+		function(v) ns.db.killHelper = v; if ns.UpdateKillTarget then pcall(ns.UpdateKillTarget) end end))
+	Add(Check(win, "Announce kill target in party chat", nil,
+		function() return ns.db.announceKill ~= false end,
+		function(v) ns.db.announceKill = v end))
+
+	y = y + 6
 	Add(Header(win, "PARTS OF THE UI  (take effect after a reload)"), 14)
 	for _, m in ipairs({ { "nameplates", "Nameplates" }, { "raid", "Raid frames (battlegrounds, raids)" }, { "actionbars", "Action bars, bags, menu, XP bar" },
 		{ "minimap", "Minimap" }, { "chat", "Chat cleanup" } }) do
@@ -223,7 +232,7 @@ local function Build()
 	Add(saveRow, 26)
 
 	local listTop = y
-	local MAX_ROWS = 8
+	local MAX_ROWS = 6
 	local rows = {}
 	local empty = Text(win, 13, false, colors.muted)
 	empty:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -listTop - 4)
