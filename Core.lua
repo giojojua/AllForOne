@@ -36,9 +36,15 @@ function ns:Listen(msg, fn)
 end
 -- One failing module must not stop the others from loading: each listener runs
 -- protected, and errors still go to the normal Lua error display.
+-- WoW hides Lua errors unless scriptErrors is on, so the first few also go to chat.
+local reported = 0
 function ns:Report(err)
+	reported = reported + 1
+	if reported <= 3 then
+		ns:Print("|cffff5555error:|r", tostring(err):match("[^\n]+") or tostring(err))
+	end
 	local handler = geterrorhandler and geterrorhandler()
-	if handler then handler(err) else ns:Print("error:", err) end
+	if handler then handler(err) end
 end
 
 function ns:Send(msg, ...)

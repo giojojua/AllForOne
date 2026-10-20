@@ -10,10 +10,14 @@ local function Step(fn)
 	if not ok then ns:Report(err) end
 end
 
+local holder
 local function SetupMinimap()
-	local holder = CreateFrame("Frame", nil, ns.root)
-	holder:SetSize(168, 168)
-	ns:Mover("minimap", "MINIMAP", holder, "TOPRIGHT", "TOPRIGHT", -24, -24)
+	local first = not holder
+	if first then
+		holder = CreateFrame("Frame", nil, ns.root)
+		holder:SetSize(168, 168)
+		ns:Mover("minimap", "MINIMAP", holder, "TOPRIGHT", "TOPRIGHT", -24, -24)
+	end
 	-- 1) our square map: done first, on its own, so nothing below can stop it
 	Step(function()
 		Minimap:SetParent(holder)
@@ -22,7 +26,7 @@ local function SetupMinimap()
 		Minimap:SetSize(168, 168)
 		Minimap:SetMaskTexture("Interface\\ChatFrame\\ChatFrameBackground")
 		Minimap:SetFrameStrata("LOW")
-		ns:Skin(Minimap, true)
+		if not Minimap.outline then ns:Skin(Minimap, true) end
 	end)
 	function GetMinimapShape() return "SQUARE" end
 
@@ -88,6 +92,7 @@ local function SetupMinimap()
 		end
 	end)
 
+	if not first then return end
 	local info = ns:CreateText(holder, 13, true, "RIGHT")
 	info:SetPoint("TOPRIGHT", Minimap, "BOTTOMRIGHT", 0, -6)
 	info:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
@@ -413,8 +418,24 @@ function ns:ShowArenaSample(on)
 end
 
 ----------------------------------------------------------------------
+-- Make sure the square map is really in place: run the setup at login, and check again
+-- after every loading screen (if anything stopped it, or the game put the map back).
+local minimapDone = false
+local function EnsureMinimap()
+	if not ns.db or not ns.db.minimap or InCombatLockdown() then return end
+	if minimapDone and Minimap:GetParent() ~= MinimapCluster then return end
+	minimapDone = true
+	local ok, err = pcall(SetupMinimap)
+	if not ok then ns:Report(err) end
+end
+ns:On("PLAYER_ENTERING_WORLD", function() if ns.loaded then EnsureMinimap() end end)
+
 ns:Listen("LOGIN", function()
-	if ns.db.minimap then SetupMinimap() end
+	if ns.db.minimap then
+		EnsureMinimap()
+	else
+		ns:Print("the minimap is left as Blizzard's (turned off in /afo settings - tick Minimap and /reload to use the square one)")
+	end
 	if ns.db.actionbars then
 		SetupMenu()
 		SetupXP()
