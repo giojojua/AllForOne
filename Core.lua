@@ -84,6 +84,7 @@ ns.defaults = {
 	classColoredBars = true, -- false = dark bars with class-colored names
 	menuAlpha = 0.6,        -- idle opacity of bags + game menu
 	nameplates = true,
+	raid = true,            -- raid frames in battlegrounds / raids
 	actionbars = true,
 	minimap = true,
 	chat = true,
@@ -292,7 +293,7 @@ SlashCmdList.ALLFORONE = function(msg)
 	end
 	local cmd, arg = strsplit(" ", strlower(raw), 2)
 	if cmd == "test" then
-		ns:Send("TOGGLE_TEST")
+		ns:Send("TOGGLE_TEST", arg and strtrim(arg) ~= "" and strtrim(arg) or nil)
 	elseif cmd == "unlock" or cmd == "move" then
 		ns:Unlock()
 	elseif cmd == "lock" then
@@ -314,7 +315,7 @@ SlashCmdList.ALLFORONE = function(msg)
 	elseif cmd == "font" then
 		ns.db.useFont = not ns.db.useFont
 		ns:Print("custom font", ns.db.useFont and "on" or "off", "- type /reload to apply")
-	elseif cmd == "nameplates" or cmd == "actionbars" or cmd == "minimap" or cmd == "chat" then
+	elseif cmd == "nameplates" or cmd == "raid" or cmd == "actionbars" or cmd == "minimap" or cmd == "chat" then
 		ns.db[cmd] = not ns.db[cmd]
 		ns:Print(cmd, ns.db[cmd] and "on" or "off", "- type /reload to apply")
 	elseif cmd == "" and ns.ToggleSettings then
@@ -324,13 +325,13 @@ SlashCmdList.ALLFORONE = function(msg)
 		ns:Print("/afo - open the settings window")
 		ns:Print("/afo unlock - move (drag) and resize (mouse wheel) any part; /afo lock to save")
 		ns:Print("/afo reset - put every part back where it started")
-		ns:Print("/afo test - show every frame with sample data")
+		ns:Print("/afo test - show every frame with sample arena data; /afo test bg - sample battleground")
 		ns:Print("/afo procs - open the proc window (choose which procs show next to your character)")
 		ns:Print("/afo profile save|load|delete <name>, /afo profile list - save and switch whole UI versions")
 		ns:Print("/afo scale 0.9 - resize the whole UI at once")
 		ns:Print("/afo colors - class-colored bars on/off")
 		ns:Print("/afo menu 0.6 - idle opacity of bags and menu (0-1)")
 		ns:Print("/afo font - bundled font on/off (off for Cyrillic/Asian names)")
-		ns:Print("/afo nameplates | actionbars | minimap | chat - turn a module on/off")
+		ns:Print("/afo nameplates | raid | actionbars | minimap | chat - turn a module on/off")
 	end
 end

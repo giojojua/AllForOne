@@ -2,7 +2,7 @@
 ## Title: AllForOne
 ## Notes: Minimal, PvP-focused UI: arena/team frames, trackers, nameplates, bars.
 ## Author: giojojua
-## Version: 0.6.0
+## Version: 0.7.0
 ## SavedVariables: AllForOneDB
 
 Core.lua
@@ -11,6 +11,7 @@ Widgets.lua
 Layout.lua
 Trackers.lua
 Units.lua
+Raid.lua
 Auras.lua
 Procs.lua
 Swing.lua
@@ -18,6 +19,7 @@ Resources.lua
 Nameplates.lua
 ActionBars.lua
 HUD.lua
+Battleground.lua
 Profiles.lua
 Settings.lua
 TestMode.lua

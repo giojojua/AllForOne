@@ -763,8 +763,16 @@ ns:Listen("LOGIN", function()
 	ns:Mover("team", "YOUR TEAM", team, "TOPLEFT", "TOPLEFT", 180, -320)
 	F.team = {}
 	F.team[1] = CreateRow("player", "pet", false, 1, team)
+	-- party rows live on their own sub-frame: in a raid (battlegrounds) they hide and the
+	-- raid frames take over, so your group isn't shown twice
+	local partyHolder = CreateFrame("Frame", nil, team, "SecureHandlerStateTemplate")
+	partyHolder:SetAllPoints(team)
+	if ns.db.raid ~= false then
+		RegisterStateDriver(partyHolder, "visibility", "[group:raid] hide; show")
+	end
+	ns.partyHolder = partyHolder
 	for i = 1, 4 do
-		F.team[i + 1] = CreateRow("party" .. i, "partypet" .. i, false, i + 1, team)
+		F.team[i + 1] = CreateRow("party" .. i, "partypet" .. i, false, i + 1, partyHolder)
 	end
 
 	local arena = Holder(ROW_W, groupH)

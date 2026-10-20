@@ -8,9 +8,9 @@
 local _, ns = ...
 
 -- settings that belong to a "UI version" (everything in the settings window)
-local KEYS = { "scale", "classColoredBars", "menuAlpha", "useFont", "nameplates", "actionbars", "minimap", "chat" }
+local KEYS = { "scale", "classColoredBars", "menuAlpha", "useFont", "nameplates", "raid", "actionbars", "minimap", "chat" }
 -- these only take effect after a reload
-local NEEDS_RELOAD = { useFont = true, nameplates = true, actionbars = true, minimap = true, chat = true }
+local NEEDS_RELOAD = { useFont = true, nameplates = true, raid = true, actionbars = true, minimap = true, chat = true }
 
 local function Copy(t)
 	if type(t) ~= "table" then return t end

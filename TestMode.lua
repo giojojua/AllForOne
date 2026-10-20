@@ -16,7 +16,8 @@ local function UseCooldown(guid, class, index, ago)
 	ns:NoteCooldownUsed(guid, class, rec.name)
 end
 
-local function Start()
+local function Start(mode)
+	local bg = (mode == "bg")
 	local now = GetTime()
 	local _, myClass = UnitClass("player")
 	ns.fake = {
@@ -32,6 +33,12 @@ local function Start()
 		targettarget = { name = "Rogue", class = "ROGUE", hp = 88 },
 		focus = { name = "Death Knight", class = "DEATHKNIGHT", hp = 77 },
 	}
+	if bg then
+		-- battleground sample: your raid instead of party / arena enemies
+		for _, u in ipairs({ "party1", "party2", "arena1", "arena2", "arenapet2", "arena3" }) do ns.fake[u] = nil end
+		ns.fake.target = { name = "Swiftpaw", class = "DRUID", hp = 28, pw = 60, ptype = 3 }
+		ns.fake.focus = nil
+	end
 	ns.specs["test-party1"] = "Subtlety"
 	ns.specs["test-party2"] = "Discipline"
 	ns.specs["test-arena1"] = "Arms"
@@ -88,10 +95,16 @@ local function Start()
 		{ name = GetSpellInfo(57761) or "Brain Freeze", icon = Icon(57761), dur = 15, expires = now + 12 },
 	})
 	ns:ShowLoC(Icon(118), "incap", 8, now + 6)
-	ns:ShowArenaSample(true)
+	if not bg then ns:ShowArenaSample(true) end
 	if ns.UpdateTargets then ns:UpdateTargets() end
 	ns:Send("RESOURCES_TEST", true)
-	ns:Print("test mode on - type /afo test again to turn it off")
+	if bg then
+		ns:Send("RAID_TEST", true)
+		ns:Send("BG_TEST", true)
+		ns:Print("battleground test mode on - type /afo test again to turn it off")
+	else
+		ns:Print("test mode on (arena) - /afo test bg shows a battleground; /afo test again turns it off")
+	end
 end
 
 local function Stop()
@@ -112,14 +125,22 @@ local function Stop()
 	ns:ShowLoC(nil)
 	ns:ShowArenaSample(false)
 	ns:Send("RESOURCES_TEST", false)
+	ns:Send("RAID_TEST", false)
+	ns:Send("BG_TEST", false)
 	ns:SetFramesForced(false)
 	ns:Print("test mode off")
 end
 
-ns:Listen("TOGGLE_TEST", function()
+ns:Listen("TOGGLE_TEST", function(mode)
 	if InCombatLockdown() then
 		ns:Print("test mode can't change during combat")
 		return
 	end
-	if ns.testing then Stop() else Start() end
+	if ns.testing then
+		Stop()
+		-- "/afo test bg" while the arena sample is on: switch straight over
+		if mode == "bg" then Start(mode) end
+	else
+		Start(mode)
+	end
 end)

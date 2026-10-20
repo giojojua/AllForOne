@@ -401,6 +401,8 @@ local matchStart, gatesAt
 
 local COUNTDOWN_MSGS = {
 	{ "One minute", 60 }, { "Thirty seconds", 30 }, { "Fifteen seconds", 15 },
+	-- battlegrounds: "The battle for Warsong Gulch begins in 1 minute."
+	{ "in 2 minutes", 120 }, { "in 1 minute", 60 }, { "in 30 seconds", 30 },
 }
 
 local function Bracket()
@@ -435,8 +437,10 @@ local function SetupArena()
 	countdown.time:SetPoint("TOP", countdown.label, "BOTTOM", 0, -4)
 	countdown:Hide()
 
+	-- runs on its own frame: in battlegrounds the arena timer is hidden but the countdown isn't
+	local driver = CreateFrame("Frame")
 	local acc = 0
-	status:SetScript("OnUpdate", function(_, e)
+	driver:SetScript("OnUpdate", function(_, e)
 		acc = acc + e
 		if acc < 0.2 then return end
 		acc = 0
@@ -468,8 +472,12 @@ local function ArenaZone()
 		status:Show()
 	else
 		status:Hide()
-		countdown:Hide()
-		matchStart, gatesAt = nil, nil
+		-- keep a battleground's gates countdown running; anywhere else, clear it
+		local _, kind = IsInInstance()
+		if kind ~= "pvp" then
+			countdown:Hide()
+			matchStart, gatesAt = nil, nil
+		end
 	end
 end
 
@@ -477,7 +485,9 @@ ns:On("PLAYER_ENTERING_WORLD", function() matchStart, gatesAt = nil, nil; ArenaZ
 ns:On("ZONE_CHANGED_NEW_AREA", ArenaZone)
 ns:On("UPDATE_BATTLEFIELD_STATUS", ArenaZone)
 ns:On("CHAT_MSG_BG_SYSTEM_NEUTRAL", function(_, msg)
-	if not ns:InArena() or not msg then return end
+	if not msg then return end
+	local _, kind = IsInInstance()
+	if kind ~= "arena" and kind ~= "pvp" then return end
 	for _, m in ipairs(COUNTDOWN_MSGS) do
 		if msg:find(m[1]) then gatesAt = GetTime() + m[2] return end
 	end
