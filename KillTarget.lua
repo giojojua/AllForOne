@@ -164,7 +164,7 @@ local tags = {}
 local function Tag(row)
 	if tags[row] then return tags[row] end
 	local t = CreateFrame("Frame", nil, row)
-	t:SetSize(50, 20)
+	t:SetSize(58, 20)
 	t:SetPoint("TOPLEFT", row, "TOPRIGHT", 6, 0)
 	ns:Skin(t)
 	t.text = ns:CreateText(t, 13, true, "CENTER")
@@ -182,7 +182,7 @@ end
 local function ShowTag(row, kind, why)
 	local t = Tag(row)
 	if not kind then t:Hide(); t.why:SetText(""); return end
-	local c = kind == "CC" and colors.dispel.Magic or colors.danger
+	local c = (kind == "CC" and colors.dispel.Magic) or (kind == "SWITCH" and colors.kick) or colors.danger
 	t.fill:SetTexture(c[1], c[2], c[3], 1)
 	t.text:SetText(kind)
 	t.why:SetText(why or "")
@@ -192,26 +192,30 @@ end
 ----------------------------------------------------------------------
 -- Party chat
 ----------------------------------------------------------------------
-local lastSent, lastOther, lastCC = 0, 0, 0
+-- Messages are short on purpose:  "Kill Grimtusk Warrior"  /  "Switch Lumen Priest"
+--   Kill   = the first call of the match
+--   Switch = only when YOU target the helper's new kill target (you confirm the swap)
+local lastSent, lastOther = 0, 0
+local announced -- GUID of the enemy we last called
 
 local function Say(msg)
 	if ns.db.announceKill == false or ns.testing then return end
 	if not ns:InArena() then return end
 	local now = GetTime()
-	-- another AllForOne user in your party already called it: don't double up
-	if now - lastOther < 4 or now - lastSent < 3 then return end
+	-- a teammate with AllForOne just called it: don't double up
+	if now - lastOther < 3 or now - lastSent < 2 then return end
 	if (GetNumPartyMembers and GetNumPartyMembers() or 0) == 0 then return end
 	lastSent = now
-	SendChatMessage("[AFO] " .. msg, "PARTY")
+	SendChatMessage(msg, "PARTY")
+	return true
 end
 
 ns:On("CHAT_MSG_PARTY", function(_, msg, author)
-	if msg and msg:find("^%[AFO%]") and author ~= UnitName("player") then lastOther = GetTime() end
+	if msg and (msg:find("^Kill ") or msg:find("^Switch ")) and author ~= UnitName("player") then lastOther = GetTime() end
 end)
 
 local function Label(e)
-	local spec = e.spec and (" " .. e.spec) or ""
-	return "#" .. e.n .. " " .. e.name .. " (" .. (UnitClass(e.unit) or e.class or "?") .. spec .. ")"
+	return e.name .. " " .. (UnitClass(e.unit) or e.class or "")
 end
 
 ----------------------------------------------------------------------
@@ -220,15 +224,17 @@ end
 local killUnit, ccUnit
 local SWITCH_MARGIN = 15
 
-local function Clear()
+-- full = new match / left the arena: forget what was called too
+local function Clear(full)
 	killUnit, ccUnit = nil, nil
+	if full then announced = nil end
 	ns.killName, ns.ccName = nil, nil
 	for _, t in pairs(tags) do t:Hide(); t.why:SetText("") end
 end
 
 local function Update()
 	if ns.db.killHelper == false or not ns.frames or not ns.frames.arena then Clear() return end
-	if not ns:InArena() and not ns.testing then Clear() return end
+	if not ns:InArena() and not ns.testing then Clear(true) return end
 	local enemies = Enemies()
 	if #enemies == 0 then Clear() return end
 	for _, e in ipairs(enemies) do Read(e) end
@@ -257,21 +263,12 @@ local function Update()
 		end
 	end
 
-	-- announce changes
+	-- first call of the match goes out right away; later changes wait for you to target them
 	local newKill = pick and pick.unit or nil
-	if newKill ~= killUnit and pick then
-		local why = table.concat(pick.reasons, ", ")
-		if swapReason then
-			Say("SWAP to " .. Label(pick) .. " - " .. swapReason)
-		else
-			Say("KILL " .. Label(pick) .. (why ~= "" and (" - " .. why) or ""))
-		end
+	if pick and not announced then
+		if Say("Kill " .. Label(pick)) then announced = pick.guid end
 	end
 	local newCC = cc and cc.unit or nil
-	if newCC and newCC ~= ccUnit and GetTime() - lastCC > 15 then
-		lastCC = GetTime()
-		Say("CC " .. Label(cc) .. " - kill target low")
-	end
 	killUnit, ccUnit = newKill, newCC
 	ns.killName = pick and pick.name or nil
 	ns.ccName = cc and cc.name or nil
@@ -281,7 +278,8 @@ local function Update()
 		local u = "arena" .. i
 		if pick and u == pick.unit then
 			local why = table.concat(pick.reasons, " · ")
-			ShowTag(row, "KILL", swapReason and ("swap: " .. swapReason) or why)
+			local switching = announced and pick.guid ~= announced
+			ShowTag(row, switching and "SWITCH" or "KILL", swapReason and ("swap: " .. swapReason) or why)
 		elseif cc and u == cc.unit then
 			ShowTag(row, "CC", "healer · your kill target is low")
 		else
@@ -305,4 +303,13 @@ ticker:Hide()
 ns:Listen("LOGIN", function()
 	ticker:Show()
 end)
-ns:On("PLAYER_ENTERING_WORLD", function() Clear() end)
+ns:On("PLAYER_ENTERING_WORLD", function() Clear(true) end)
+
+-- you targeted the helper's new kill target: tell the party to switch
+ns:On("PLAYER_TARGET_CHANGED", function()
+	if not killUnit or not UnitExists("target") or not UnitIsUnit("target", killUnit) then return end
+	local guid = UnitGUID(killUnit)
+	if not announced or guid == announced then return end
+	local e = { unit = killUnit, name = UnitName(killUnit) or killUnit, class = select(2, UnitClass(killUnit)) }
+	if Say("Switch " .. Label(e)) then announced = guid end
+end)

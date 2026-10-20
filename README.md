@@ -31,7 +31,7 @@ Marks one enemy **KILL** (red tag next to their frame and on their nameplate) an
 - **Lowers it:** a defensive up right now. Immune (Divine Shield, Ice Block, Deterrence, Hand of Protection) means **SWAP**: the mark moves to someone else at once.
 - **CC** goes on their healer when your kill target drops under 60%.
 - It doesn't flip back and forth: a new target has to be clearly better before the mark moves.
-- **Party announce:** changes go to party chat, e.g. `[AFO] KILL #1 Grimtusk (Warrior Arms) - 41%, trinket down` or `[AFO] SWAP to #3 ... - Ice Block on #2`. At most one message every 3 seconds, and if a teammate also runs AllForOne, only one of you announces.
+- **Party announce:** short messages in party chat. `Kill Grimtusk Warrior` when the helper makes its first call of the match. When it later suggests another target, the tag turns amber **SWITCH**, and `Switch Lumen Priest` is only sent once **you** target that enemy, so the party follows your actual swap. If a teammate also runs AllForOne and just called it, you stay quiet.
 - Turn the helper or the announcements off in `/afo` settings (ARENA).
 - It's a strong hint, not an order: it can't see positioning or line of sight, and the enemy spec is only known once they cast something spec-specific.
 
