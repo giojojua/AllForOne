@@ -80,6 +80,9 @@ A profile is a snapshot of your whole UI: where every part sits and how big it i
 - Or type `/afo profile save Arena 3v3`, `/afo profile load Arena 3v3`, `/afo profile delete Arena 3v3`, `/afo profile list`.
 - Loading a profile doesn't save your current UI first, so save it before switching if you want to keep it. Profiles can't be loaded in combat, and font / turned-off parts change after a `/reload`. Your proc list isn't part of a profile; it stays the same in all of them.
 
+### Red error messages
+`/afo` → LOOK → **Hide red error messages** turns off the red text in the middle of the screen ("Not enough rage", "Out of range", "Spell is not ready yet"). Yellow information (quest progress, "joined the queue", battleground messages) keeps showing. Off by default; saved in profiles.
+
 ### Clicking frames
 - **Left-click** any frame: target. **Shift + left-click**: set focus.
 - **Right-click** an enemy arena frame: set focus. Right-click your **focus frame**: clear focus. Right-click your own / party / raid frames: the usual menu.

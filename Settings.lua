@@ -157,6 +157,9 @@ local function Build()
 	Add(Check(win, "Macro names on action buttons", nil,
 		function() return ns.db.macroNames ~= false end,
 		function(v) ns.db.macroNames = v; ns:Send("REFRESH_ALL") end))
+	Add(Check(win, "Hide red error messages", "yellow info still shows",
+		function() return ns.db.hideErrors == true end,
+		function(v) ns.db.hideErrors = v; ns:ApplyErrorFilter() end))
 	Add(Check(win, "Bundled font", "turn off for Cyrillic / Asian names · reload",
 		function() return ns.db.useFont end,
 		function(v) ns.db.useFont = v end))
