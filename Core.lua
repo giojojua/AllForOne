@@ -83,6 +83,7 @@ ns.defaults = {
 	scale = 1,              -- extra scale on top of the 1080p layout
 	classColoredBars = true, -- false = dark bars with class-colored names
 	menuAlpha = 0.6,        -- idle opacity of bags + game menu
+	macroNames = true,      -- macro names on action buttons
 	nameplates = true,
 	raid = true,            -- raid frames in battlegrounds / raids
 	actionbars = true,
