@@ -23,15 +23,15 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 - **Next to your character:** proc alerts (Fingers of Frost, Hot Streak, Predator's Swiftness, …) and a loss-of-control alert when you are CC'd.
 - **Nameplates:** class colors, health and percentage inside the bar (`23.1k · 74%`), arena number, your debuffs, big CC from anyone, combo points; friendly plates are thin and only show dispellable CC. Totems (Tremor, Grounding, Earthbind…) get half-size plates with the totem's icon.
 - **Bottom:** 3 action bars in the middle (bar 1 at the bottom, bar 2 above, bar 3 on top) with the XP/rep bar under them; stance/forms/auras above their left corner and the pet bar above their right corner; 2 vertical bars bottom-right above bags and game menu (faded until hovered). Your Blizzard keybinds keep working. Button icons turn **red** when your target is out of range for that spell, **blue** when you don't have enough mana / rage / energy / runic power, and **dark** when it can't be used right now; this works for macros too (turn it off in `/afo` settings).
-- **Top:** arena map, bracket and match timer, big gates countdown; buffs (up to 16) and debuffs (up to 8) next to a square minimap (mouse wheel zooms) with small tracking, calendar, world map and addon buttons, clock and latency under it. The addon button (gear, with a count) opens a dropdown holding every other addon's minimap button, so they don't clutter the map; Esc or another click closes it.
+- **Top:** arena bar with map, bracket, match timer and players alive (`3 v 3`); the gates countdown is shown inside that bar (`GATES 0:31`), also in battlegrounds; buffs (up to 16) and debuffs (up to 8) next to a square minimap (mouse wheel zooms) with small tracking, calendar, world map and addon buttons, clock and latency under it. The addon button (gear, with a count) opens a dropdown holding every other addon's minimap button, so they don't clutter the map; Esc or another click closes it.
 
 ### Kill target helper (arena 2s, 3s, solo queue)
-Marks one enemy **KILL** (red tag next to their frame and on their nameplate) and, when it matters, their healer **CC** (blue), with the reasons under the tag.
+Puts a **red cross** right next to the health % of the enemy to kill (on their frame and nameplate) and, when it matters, a **blue square** on their healer to crowd-control. When the target should change, the cross simply moves. Hover an enemy frame to see the reasons.
 - **Raises an enemy's score:** low health, PvP trinket used, big defensives on cooldown (Divine Shield, Ice Block, Cloak, Evasion, Pain Suppression, Barkskin, Shield Wall, Deterrence, Icebound Fortitude...), a class/spec with few escapes, no stun diminishing returns yet, their healer crowd-controlled. In 2s a healer next to a very tanky partner leans toward KILL; a drinking healer gets pushed up.
 - **Lowers it:** a defensive up right now. Immune (Divine Shield, Ice Block, Deterrence, Hand of Protection) means **SWAP**: the mark moves to someone else at once.
 - **CC** goes on their healer when your kill target drops under 60%.
 - It doesn't flip back and forth: a new target has to be clearly better before the mark moves.
-- **Party announce:** short messages in party chat. `Kill Warrior` when the helper makes its first call of the match. When it later suggests another target, the tag turns amber **SWITCH**, and `Switch Priest` is only sent once **you** target that enemy (with two of the same class it adds the name: `Kill Grimtusk Warrior`), so the party follows your actual swap. If a teammate also runs AllForOne and just called it, you stay quiet.
+- **Party announce:** short messages in party chat. `Kill Warrior` when the helper makes its first call of the match. When it later suggests another target, the cross moves, and `Switch Priest` is only sent once **you** target that enemy (with two of the same class it adds the name: `Kill Grimtusk Warrior`), so the party follows your actual swap. If a teammate also runs AllForOne and just called it, you stay quiet.
 - Turn the helper or the announcements off in `/afo` settings (ARENA).
 - It's a strong hint, not an order: it can't see positioning or line of sight, and the enemy spec is only known once they cast something spec-specific.
 
@@ -66,7 +66,8 @@ Limits: only what the combat log shows within about 50 yards; no line of sight o
 - **Flag carriers (Warsong Gulch, Eye of the Storm):** two rows under the minimap: **EFC** (enemy carrying your flag) and **FFC** (your carrier) with class color, health when known (raid member, or an enemy you target/focus/mouse over) and how long they've held it. Click a row to target that carrier. WoW doesn't let addons change click targets during combat, so if a carrier changes mid-fight, the click updates once you leave combat.
 - **Score:** Blizzard's battleground score at the top is movable ("BATTLEGROUND SCORE") and uses the UI font.
 - **Capture timers:** bases, towers and graveyards being taken (Arathi Basin, Isle of Conquest: 1 min; Alterac Valley: 4 min) count down under the score in the capturing faction's color.
-- **Gates countdown** also works in battlegrounds.
+- **Gates countdown** also works in battlegrounds (in a small bar at the top, gone once the gates open).
+- **Arenas after a battleground:** arenas always use the party rows, even if you come straight from a raid or the server puts the arena team in a raid group.
 - `/afo test bg` shows a sample battleground (raid grid, flag carriers, timers).
 - Flag, capture and countdown events come from the English system messages, so they need an English game client.
 

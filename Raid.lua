@@ -241,7 +241,7 @@ local function IsBigBattleground()
 	return BIG_ZONES[GetRealZoneText() or ""] or ((GetNumRaidMembers and GetNumRaidMembers()) or 0) > 25
 end
 
-local queued
+local queued, arenaMode
 ApplyShape = function()
 	if not header then return end
 	-- the game only lets addons change this out of combat: do it right after combat
@@ -251,6 +251,19 @@ ApplyShape = function()
 			ns:SafeCall(function() queued = false; ApplyShape() end)
 		end
 		return
+	end
+	-- arenas always use the party rows (trinkets, cooldowns, who-targets-whom), even when the
+	-- server puts the arena team in a raid group or you come straight from a battleground raid
+	local arena = ns:InArena() and true or false
+	if arena ~= arenaMode then
+		arenaMode = arena
+		if arena then
+			header:Hide()
+			if ns.partyHolder then RegisterStateDriver(ns.partyHolder, "visibility", "show") end
+		else
+			header:Show()
+			if ns.partyHolder then RegisterStateDriver(ns.partyHolder, "visibility", "[group:raid] hide; show") end
+		end
 	end
 	local perColumn = IsBigBattleground() and 10 or 5
 	if shape == perColumn then return end

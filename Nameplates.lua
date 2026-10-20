@@ -75,6 +75,11 @@ local function Setup(plate)
 	-- health on enemy plates: "31.2k · 74%" inside the bar
 	d.hpText = ns:CreateText(d.hp, 10, true, "RIGHT")
 	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -3, 0)
+	-- kill target helper mark (red cross / blue square), left of the health text
+	d.mark = d.hp:CreateTexture(nil, "OVERLAY")
+	d.mark:SetSize(16, 16)
+	d.mark:SetPoint("RIGHT", d.hpText, "LEFT", -2, 0)
+	d.mark:Hide()
 
 	d.name = ns:CreateText(f, 13, true, "LEFT")
 	d.name:SetPoint("BOTTOMLEFT", d.hp, "TOPLEFT", 0, 3)
@@ -221,6 +226,7 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.name:SetText("")
 	d.num:SetText("")
 	d.hpText:SetText("")
+	d.mark:Hide()
 	d.castbar:Hide()
 	for _, pip in ipairs(d.pips) do pip:Hide() end
 	for _, icon in ipairs(d.mine) do icon:Clear() end
@@ -300,6 +306,7 @@ local function UpdatePlate(plate, d)
 		d.name:SetText("")
 		d.num:SetText("")
 		d.hpText:SetText("")
+		d.mark:Hide()
 	else
 		d.name:SetText(name or "")
 		local cur = d.health:GetValue() or 0
@@ -314,10 +321,16 @@ local function UpdatePlate(plate, d)
 			d.wasTargetFont = isTarget
 			ns:Font(d.hpText, isTarget and 11 or 10, true)
 		end
-		-- kill target helper: KILL / CC next to the arena number
-		local mark = (name and name == ns.killName and "|cffe5484dKILL|r") or (name and name == ns.ccName and "|cff3d9bffCC|r") or nil
-		local num = arena and tostring(arena) or ""
-		d.num:SetText(mark and (num ~= "" and (mark .. " " .. num) or mark) or num)
+		-- kill target helper: red cross (KILL) / blue square (CC) next to the arena number
+		local icon = (name and name == ns.killName and ns.KILL_ICON) or (name and name == ns.ccName and ns.CC_ICON) or nil
+		-- the mark sits just left of the health % inside the bar
+		if icon then
+			d.mark:SetTexture(icon)
+			d.mark:Show()
+		else
+			d.mark:Hide()
+		end
+		d.num:SetText(arena and tostring(arena) or "")
 		if d.wasTarget ~= isTarget then
 			d.wasTarget = isTarget
 			ns:Font(d.name, isTarget and 14 or 13, true)
