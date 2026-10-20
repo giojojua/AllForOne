@@ -23,7 +23,7 @@ local function Start()
 		player = { name = UnitName("player"), class = myClass, hp = 72, pw = 64, ptype = UnitPowerType("player") },
 		pet = { name = "Water Elemental", class = myClass, hp = 90, creature = "Elemental" },
 		party1 = { name = "Rogue", class = "ROGUE", hp = 88, pw = 70, ptype = 3 },
-		party2 = { name = "Priest", class = "PRIEST", hp = 64, pw = 58, ptype = 0 },
+		party2 = { name = "Priest", class = "PRIEST", hp = 64, pw = 58, ptype = 0, drinking = true },
 		arena1 = { enemy = true, name = "Warrior", class = "WARRIOR", hp = 41, pw = 55, ptype = 1 },
 		arena2 = { enemy = true, name = "Death Knight", class = "DEATHKNIGHT", hp = 77, pw = 30, ptype = 6 },
 		arenapet2 = { name = "Ghoul", class = "DEATHKNIGHT", hp = 64, creature = "Undead" },
@@ -70,6 +70,9 @@ local function Start()
 		{ icon = Icon(53601) },
 	}
 	ns.fakeCombo = 3
+	-- who targets whom: two of you on the Paladin, Warrior on you, DK on your Priest
+	ns.fakeTargets = { player = "arena3", party1 = "arena3", arena1 = "player", arena2 = "party2", arena3 = "party1" }
+	ns.fakeRunes = true
 
 	ns.testing = true
 	ns:SetFramesForced(true)
@@ -86,6 +89,8 @@ local function Start()
 	})
 	ns:ShowLoC(Icon(118), "incap", 8, now + 6)
 	ns:ShowArenaSample(true)
+	if ns.UpdateTargets then ns:UpdateTargets() end
+	ns:Send("RESOURCES_TEST", true)
 	ns:Print("test mode on - type /afo test again to turn it off")
 end
 
@@ -97,6 +102,7 @@ local function Stop()
 		end
 	end
 	ns.fake, ns.fakeDebuffs, ns.fakeTargetDebuffs, ns.fakeTargetBuffs, ns.fakeCombo = nil, nil, nil, nil, nil
+	ns.fakeTargets, ns.fakeRunes = nil, nil
 	local F = ns.frames
 	F.target.castbar:Fake(nil)
 	F.arena[3].castbar:Fake(nil)
@@ -105,6 +111,7 @@ local function Stop()
 	ns:ShowProcs({})
 	ns:ShowLoC(nil)
 	ns:ShowArenaSample(false)
+	ns:Send("RESOURCES_TEST", false)
 	ns:SetFramesForced(false)
 	ns:Print("test mode off")
 end

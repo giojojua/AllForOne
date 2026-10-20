@@ -268,6 +268,41 @@ local procSuggestions = {
 ns.CC, ns.CD, ns.Racial, ns.Spec, ns.ProcSuggest, ns.Trinket, ns.Resets = {}, {}, {}, {}, {}, {}, {}
 ns.classCooldowns = {}  -- class -> ordered list of cooldown records
 
+-- Shaman totems: the totem NPC has the same name as the spell that drops it, so the
+-- nameplate can show the right icon. (Ranked totems end in "VI", "X"...; we strip that.)
+local totemSpells = {
+	8143,  -- Tremor Totem
+	8177,  -- Grounding Totem
+	2484,  -- Earthbind Totem
+	8170,  -- Cleansing Totem
+	16190, -- Mana Tide Totem
+	5394,  -- Healing Stream Totem
+	5675,  -- Mana Spring Totem
+	3599,  -- Searing Totem
+	8190,  -- Magma Totem
+	30706, -- Totem of Wrath
+	8227,  -- Flametongue Totem
+	5730,  -- Stoneclaw Totem
+	8071,  -- Stoneskin Totem
+	8075,  -- Strength of Earth Totem
+	8512,  -- Windfury Totem
+	3738,  -- Wrath of Air Totem
+	8181,  -- Frost Resistance Totem
+	8184,  -- Fire Resistance Totem
+	10595, -- Nature Resistance Totem
+	6495,  -- Sentry Totem
+	2062,  -- Earth Elemental Totem
+	2894,  -- Fire Elemental Totem
+}
+-- English names work even before spell data is cached
+ns.Totems = {
+	["Tremor Totem"] = "Interface\\Icons\\Spell_Nature_TremorTotem",
+	["Grounding Totem"] = "Interface\\Icons\\Spell_Nature_GroundingTotem",
+	["Earthbind Totem"] = "Interface\\Icons\\Spell_Nature_StrengthOfEarthTotem02",
+	["Cleansing Totem"] = "Interface\\Icons\\Spell_Nature_DiseaseCleansingTotem",
+	["Mana Tide Totem"] = "Interface\\Icons\\Spell_Frost_SummonWaterElemental",
+}
+
 local function Info(id)
 	local name, _, icon = GetSpellInfo(id)
 	return name, icon
@@ -332,6 +367,10 @@ ns:Listen("LOGIN", function()
 	for _, id in ipairs(ns.trinketSpells) do
 		local name = Info(id)
 		if name then ns.Trinket[name] = true end
+	end
+	for _, id in ipairs(totemSpells) do
+		local name, icon = Info(id)
+		if name then ns.Totems[name] = icon end
 	end
 end)
 

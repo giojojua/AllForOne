@@ -6,6 +6,7 @@ local colors = ns.colors
 local GetTime = GetTime
 
 local plates = {}
+ns.plates = plates
 local childCount = 0
 local npcIcons = {} -- npc name -> creature-type icon (learned from target/mouseover/focus)
 
@@ -181,11 +182,56 @@ local function LayoutAuras(d, anchorTop, friendly, guid, unit)
 	end
 end
 
+-- Totems: half-size plate with the totem's own icon (Tremor, Grounding, Earthbind...)
+local function TotemIcon(name)
+	if not name or not ns.Totems then return nil end
+	return ns.Totems[name] or ns.Totems[(name:gsub("%s+[IVX]+$", ""))]
+end
+
+local function UpdateTotem(d, icon, friendly, r, g, b)
+	d.isTotem = true
+	d.hp:SetSize(64, 5)
+	if friendly then
+		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
+	else
+		d.hp:SetStatusBarColor(r, g, b)
+	end
+	ns:SetHighlight(d.hp, false)
+	local min, max = d.health:GetMinMaxValues()
+	d.hp:SetMinMaxValues(min, max)
+	d.hp:SetValue(d.health:GetValue())
+	-- the icon is the important part: big and centered above the small bar
+	d.classIcon:SetSize(22, 22)
+	d.classIcon:ClearAllPoints()
+	d.classIcon:SetPoint("BOTTOM", d.hp, "TOP", 0, 3)
+	d.classIcon.tex:SetTexture(icon)
+	d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	local c = friendly and colors.friendly or colors.danger
+	d.classIcon:SetBorder(c[1], c[2], c[3])
+	d.classIcon:Show()
+	d.name:SetText("")
+	d.num:SetText("")
+	d.castbar:Hide()
+	for _, pip in ipairs(d.pips) do pip:Hide() end
+	for _, icon in ipairs(d.mine) do icon:Clear() end
+	d.big:Clear()
+end
+
 local function UpdatePlate(plate, d)
 	local r, g, b = d.health:GetStatusBarColor()
 	local kind, class = Classify(r, g, b)
 	local name = d.nameText:GetText()
 	local friendly = (kind == "friendlyPlayer" or kind == "friendlyNPC")
+
+	local totem = TotemIcon(name)
+	if totem then return UpdateTotem(d, totem, friendly, r, g, b) end
+	if d.isTotem then
+		-- plate frames get reused: put the normal layout back
+		d.isTotem = nil
+		d.classIcon:ClearAllPoints()
+		d.classIcon:SetPoint("RIGHT", d.hp, "LEFT", -5, 0)
+		d.classIcon:SetBorder()
+	end
 	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
 	local arena = (not friendly) and ArenaNumber(name)
 	local unit = name and PlateUnit(name, isTarget, arena)
@@ -327,5 +373,7 @@ scanner:Hide()
 ns:Listen("LOGIN", function()
 	if not ns.db.nameplates then return end
 	SetCVar("ShowClassColorInNameplate", "1")
+	-- enemy totems get (small) plates too
+	pcall(SetCVar, "nameplateShowEnemyTotems", "1")
 	scanner:Show()
 end)

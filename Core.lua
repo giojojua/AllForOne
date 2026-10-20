@@ -291,8 +291,11 @@ SlashCmdList.ALLFORONE = function(msg)
 	elseif cmd == "nameplates" or cmd == "actionbars" or cmd == "minimap" or cmd == "chat" then
 		ns.db[cmd] = not ns.db[cmd]
 		ns:Print(cmd, ns.db[cmd] and "on" or "off", "- type /reload to apply")
+	elseif cmd == "" and ns.ToggleSettings then
+		ns:ToggleSettings()
 	else
 		ns:Print("commands:")
+		ns:Print("/afo - open the settings window")
 		ns:Print("/afo unlock - move (drag) and resize (mouse wheel) any part; /afo lock to save")
 		ns:Print("/afo reset - put every part back where it started")
 		ns:Print("/afo test - show every frame with sample data")
