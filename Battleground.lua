@@ -34,15 +34,54 @@ local function Other(f) return f == "Alliance" and "Horde" or "Alliance" end
 -- Score (WorldStateAlwaysUpFrame)
 ----------------------------------------------------------------------
 local scoreHolder, placing
+local shiftX = 0 -- sideways nudge so the score lines are centered on the holder
 
 local function PlaceScore()
 	if placing or not scoreHolder or not WorldStateAlwaysUpFrame then return end
 	placing = true
 	WorldStateAlwaysUpFrame:SetParent(scoreHolder)
 	WorldStateAlwaysUpFrame:ClearAllPoints()
-	WorldStateAlwaysUpFrame:SetPoint("TOP", scoreHolder, "TOP", 0, 0)
+	WorldStateAlwaysUpFrame:SetPoint("TOP", scoreHolder, "TOP", shiftX, 0)
 	placing = false
 end
+
+-- Blizzard lines the score rows up from a fixed left edge, so with our font the block sits
+-- off-center. Measure the visible rows (icon to end of text) and shift the whole block so its
+-- middle is the holder's middle.
+local function CenterScore()
+	if not scoreHolder or not WorldStateAlwaysUpFrame then return end
+	local left, right
+	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 0) do
+		local row = _G["AlwaysUpFrame" .. i]
+		local text = _G["AlwaysUpFrame" .. i .. "Text"]
+		if row and row:IsShown() and text and (text:GetText() or "") ~= "" then
+			local l = row:GetLeft()
+			local icon = _G["AlwaysUpFrame" .. i .. "Icon"]
+			if icon and icon:IsShown() and icon:GetLeft() then l = math.min(l or icon:GetLeft(), icon:GetLeft()) end
+			local r = text:GetLeft() and (text:GetLeft() + text:GetStringWidth())
+			if l and r then
+				left = left and math.min(left, l) or l
+				right = right and math.max(right, r) or r
+			end
+		end
+	end
+	local cx = scoreHolder:GetCenter()
+	if not left or not cx then return end
+	-- rows are children of the moved frame, so they share the holder's scale
+	local delta = cx - (left + right) / 2
+	if math.abs(delta) > 0.5 then
+		shiftX = shiftX + delta
+		PlaceScore()
+	end
+end
+
+-- measure one frame later, once the game has laid out the new text
+local centerer = CreateFrame("Frame")
+centerer:Hide()
+centerer:SetScript("OnUpdate", function(self)
+	self:Hide()
+	CenterScore()
+end)
 
 local function StyleScore()
 	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 0) do
@@ -53,12 +92,13 @@ local function StyleScore()
 			text:SetTextColor(1, 1, 1)
 		end
 	end
+	centerer:Show()
 end
 
 local function SetupScore()
 	scoreHolder = CreateFrame("Frame", nil, ns.root)
 	scoreHolder:SetSize(260, 56)
-	ns:Mover("bgscore", "BATTLEGROUND SCORE", scoreHolder, "TOP", "TOP", 0, -12)
+	ns:Mover("bgscore", "BATTLEGROUND SCORE", scoreHolder, "TOP", "TOP", 0, -40)
 	if not WorldStateAlwaysUpFrame then return end
 	PlaceScore()
 	hooksecurefunc(WorldStateAlwaysUpFrame, "SetPoint", function() if not placing then PlaceScore() end end)
@@ -66,6 +106,8 @@ local function SetupScore()
 		hooksecurefunc("WorldStateAlwaysUpFrame_Update", StyleScore)
 	end
 	StyleScore()
+	-- re-center when the holder is moved or resized in move mode
+	ns:Listen("LAYOUT_CHANGED", function(key) if key == "bgscore" then centerer:Show() end end)
 end
 
 ----------------------------------------------------------------------
@@ -293,7 +335,7 @@ end
 local function SetupTimers()
 	timerHolder = CreateFrame("Frame", nil, ns.root)
 	timerHolder:SetSize(240, 106)
-	ns:Mover("bgtimers", "CAPTURE TIMERS", timerHolder, "TOP", "TOP", 0, -84)
+	ns:Mover("bgtimers", "CAPTURE TIMERS", timerHolder, "TOP", "TOP", 0, -104)
 	local acc = 0
 	timerHolder:SetScript("OnUpdate", function(_, e)
 		acc = acc + e
