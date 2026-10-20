@@ -131,12 +131,27 @@ local function SkinButton(b)
 		macro:SetAlpha(ns.db.macroNames == false and 0 or 1)
 		macroTexts[#macroTexts + 1] = macro
 	end
+	-- keybind: bigger, bold, white with an outline (Blizzard draws it small and grey)
 	local hotkey = _G[name .. "HotKey"]
 	if hotkey then
-		ns:Font(hotkey, 10, true)
+		local size = math.max(11, floor((b:GetWidth() or 36) * 0.36 + 0.5))
+		ns:Font(hotkey, size, true)
+		hotkey:SetShadowColor(0, 0, 0, 1)
+		hotkey:SetShadowOffset(1, -1)
 		hotkey:ClearAllPoints()
-		hotkey:SetPoint("TOPRIGHT", -2, -2)
+		hotkey:SetPoint("TOPRIGHT", -1, -2)
 		hotkey:SetJustifyH("RIGHT")
+		-- Blizzard re-colors it all the time: grey when in range, red when out of range.
+		-- Keep it white, and a clear red only when out of range.
+		local setColor = hotkey.SetVertexColor
+		hotkey.SetVertexColor = function(self, r, g, bl)
+			if r and r > 0.9 and g and g < 0.3 then
+				setColor(self, 1, 0.3, 0.3)
+			else
+				setColor(self, 1, 1, 1)
+			end
+		end
+		hotkey:SetVertexColor(1, 1, 1)
 	end
 	local count = _G[name .. "Count"]
 	if count then
