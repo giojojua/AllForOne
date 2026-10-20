@@ -334,7 +334,25 @@ local function FillList(extra)
 			b.bottom = ns:CreateText(b, 11, false, "LEFT")
 			b.bottom:SetPoint("BOTTOMLEFT", 6, 5)
 			b.bottom:SetPoint("RIGHT", -6, 0)
-			b:SetScript("OnClick", function(self) ShowReport(self.match) end)
+			b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+			b:SetScript("OnClick", function(self, button)
+				-- right-click: fix a wrong WIN / LOSS by hand
+				if button == "RightButton" and not self.match.test then
+					A:SetResult(self.match, self.match.result == "win" and "loss" or "win")
+					local keep = selected
+					FillList()
+					ShowReport(keep)
+					return
+				end
+				ShowReport(self.match)
+			end)
+			b:SetScript("OnEnter", function(self)
+				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+				GameTooltip:SetText(self.match.date or "")
+				GameTooltip:AddLine("Right-click to switch WIN / LOSS if it's wrong", 0.75, 0.76, 0.78)
+				GameTooltip:Show()
+			end)
+			b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 			listButtons[i] = b
 		end
 		b.match = m

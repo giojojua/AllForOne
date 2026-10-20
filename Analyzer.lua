@@ -294,6 +294,8 @@ local function GatesOpen()
 	if M and not M.start then
 		M.start = Now()
 		Timeline("Gates open")
+		-- ask for the scoreboard now, so it's there to tell the teams apart at the end
+		if RequestBattlefieldScoreData then RequestBattlefieldScoreData() end
 	end
 end
 
@@ -734,14 +736,54 @@ ns:On("CHAT_MSG_BG_SYSTEM_NEUTRAL", function(_, msg)
 	if M and msg and msg:find("has begun") then GatesOpen() end
 end)
 ns:On("ARENA_OPPONENT_UPDATE", function() if M then RefreshUnits() end end)
+-- Win or loss. Servers don't all number the teams the same way, so this doesn't rely on one
+-- call: first who died (everyone on one side dead = clear result), then your own team as
+-- the scoreboard lists it compared with the winner, and only then the arena faction call.
+local function MyScoreTeam()
+	if not GetNumBattlefieldScores or not GetBattlefieldScore then return nil end
+	local me = UnitName("player")
+	for i = 1, GetNumBattlefieldScores() or 0 do
+		local name, _, _, _, _, team = GetBattlefieldScore(i)
+		if name and (name == me or name:match("^[^-]+") == me) then return team end
+	end
+end
+
+local function ResultFromDeaths(m)
+	local theirs, theirsDead = #m.enemies, 0
+	for _, e in ipairs(m.enemies) do if e.died then theirsDead = theirsDead + 1 end end
+	local oursDead = 0
+	for _, d in ipairs(m.deaths) do if d.side == "us" then oursDead = oursDead + 1 end end
+	local ours = 0
+	for _ in pairs(m.teamSeen or {}) do ours = ours + 1 end
+	if theirs > 0 and theirsDead >= theirs and oursDead < math.max(1, ours) then return "win" end
+	if ours > 0 and oursDead >= ours and theirsDead < theirs then return "loss" end
+end
+
+local function DecideResult(winner)
+	if winner == 255 then return "draw" end
+	local byDeaths = M and ResultFromDeaths(M)
+	if byDeaths then return byDeaths end
+	local team = MyScoreTeam()
+	if team == nil and GetBattlefieldArenaFaction then team = GetBattlefieldArenaFaction() end
+	if team == nil then return "loss" end
+	return (winner == team) and "win" or "loss"
+end
+A.DecideResult = DecideResult
+
 ns:On("UPDATE_BATTLEFIELD_STATUS", function()
 	if not M or not GetBattlefieldWinner then return end
 	local winner = GetBattlefieldWinner()
 	if winner == nil then return end
-	local mine = GetBattlefieldArenaFaction and GetBattlefieldArenaFaction()
-	local result = (winner == 255 and "draw") or ((mine ~= nil and winner == mine) and "win") or "loss"
-	Finish(result)
+	Finish(DecideResult(winner))
 end)
+
+-- the report window can correct a stored result by hand
+function A:SetResult(m, result)
+	if m and not m.test then
+		m.result = result
+		A.historyCache = nil
+	end
+end
 
 ----------------------------------------------------------------------
 -- Analysis: notes from the numbers (also used for the test report)
