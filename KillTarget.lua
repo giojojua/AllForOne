@@ -214,8 +214,17 @@ ns:On("CHAT_MSG_PARTY", function(_, msg, author)
 	if msg and (msg:find("^Kill ") or msg:find("^Switch ")) and author ~= UnitName("player") then lastOther = GetTime() end
 end)
 
+-- "Warrior", or "Grimtusk Warrior" when the enemy team has two of that class
 local function Label(e)
-	return UnitClass(e.unit) or e.class or "?"
+	local _, class = UnitClass(e.unit)
+	local text = UnitClass(e.unit) or e.class or "?"
+	local same = 0
+	for i = 1, 5 do
+		local u = "arena" .. i
+		if UnitExists(u) and select(2, UnitClass(u)) == class then same = same + 1 end
+	end
+	if same > 1 then text = (UnitName(e.unit) or "") .. " " .. text end
+	return text
 end
 
 ----------------------------------------------------------------------
