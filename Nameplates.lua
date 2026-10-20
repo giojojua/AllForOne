@@ -57,7 +57,7 @@ local function Setup(plate)
 	-- the game keeps resetting these, so park them on a hidden frame instead of fading them
 	-- (we still read the name with GetText)
 	for _, region in ipairs({ nameText, levelText, bossIcon, eliteIcon }) do
-		region:SetParent(ns.hider)
+		if not pcall(region.SetParent, region, ns.hider) then region:SetAlpha(0) end
 		region:Hide()
 	end
 	health:SetAlpha(0)

@@ -176,10 +176,21 @@ local hider = CreateFrame("Frame")
 hider:Hide()
 ns.hider = hider
 
+-- Hide a Blizzard frame for good. Textures and font strings (e.g. MinimapBorder) can't
+-- always be moved to another parent in 3.3.5, so those are blanked and kept hidden instead.
+local function noop() end
 function ns:Kill(frame)
 	if not frame then return end
+	local kind = frame.GetObjectType and frame:GetObjectType()
+	if kind == "Texture" or kind == "FontString" then
+		if kind == "Texture" then frame:SetTexture(nil) end
+		frame:SetAlpha(0)
+		frame:Hide()
+		frame.Show = noop
+		return
+	end
 	if frame.UnregisterAllEvents then frame:UnregisterAllEvents() end
-	frame:SetParent(hider)
+	if not pcall(frame.SetParent, frame, hider) then frame.Show = noop end
 	frame:Hide()
 end
 

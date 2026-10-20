@@ -5,45 +5,62 @@ local colors, media = ns.colors, ns.media
 ----------------------------------------------------------------------
 -- Minimap: square, top-right, clock + latency under it
 ----------------------------------------------------------------------
+local function Step(fn)
+	local ok, err = pcall(fn)
+	if not ok then ns:Report(err) end
+end
+
 local function SetupMinimap()
 	local holder = CreateFrame("Frame", nil, ns.root)
 	holder:SetSize(168, 168)
 	ns:Mover("minimap", "MINIMAP", holder, "TOPRIGHT", "TOPRIGHT", -24, -24)
-	Minimap:SetParent(holder)
-	Minimap:ClearAllPoints()
-	Minimap:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
-	Minimap:SetSize(168, 168)
-	Minimap:SetMaskTexture(media.flat)
-	Minimap:SetFrameStrata("LOW")
-	ns:Skin(Minimap, true)
+	-- 1) our square map: done first, on its own, so nothing below can stop it
+	Step(function()
+		Minimap:SetParent(holder)
+		Minimap:ClearAllPoints()
+		Minimap:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
+		Minimap:SetSize(168, 168)
+		Minimap:SetMaskTexture("Interface\\ChatFrame\\ChatFrameBackground")
+		Minimap:SetFrameStrata("LOW")
+		ns:Skin(Minimap, true)
+	end)
 	function GetMinimapShape() return "SQUARE" end
 
-	for _, name in ipairs({ "MinimapBorder", "MinimapBorderTop", "MinimapZoomIn", "MinimapZoomOut",
-		"MiniMapWorldMapButton", "MinimapZoneTextButton", "MinimapToggleButton", "GameTimeFrame",
-		"MiniMapVoiceChatFrame", "MinimapNorthTag", "MiniMapTracking" }) do
+	-- 2) Blizzard's round art. MinimapBorder, MinimapBorderTop, MinimapNorthTag and the compass
+	-- are textures (not frames), so each one is hidden on its own.
+	-- keep these: move them onto the map itself first, so hiding Blizzard's backdrop can't take them along
+	for _, name in ipairs({ "MiniMapBattlefieldFrame", "MiniMapLFGFrame", "MiniMapMailFrame", "MiniMapInstanceDifficulty" }) do
 		local f = _G[name]
-		if f then ns:Kill(f) end
+		if f then Step(function() f:SetParent(Minimap) end) end
 	end
-	if MinimapCluster then MinimapCluster:EnableMouse(false) end
-	if MinimapBackdrop then MinimapBackdrop:Hide() end
+	if MinimapBackdrop then Step(function() ns:Kill(MinimapBackdrop) end) end
+	for _, name in ipairs({ "MinimapBorder", "MinimapBorderTop", "MinimapNorthTag", "MinimapCompassTexture",
+		"MinimapZoomIn", "MinimapZoomOut", "MiniMapWorldMapButton", "MinimapZoneTextButton", "MinimapToggleButton",
+		"GameTimeFrame", "MiniMapVoiceChatFrame", "MiniMapTracking" }) do
+		local f = _G[name]
+		if f then Step(function() ns:Kill(f) end) end
+	end
+	if MinimapCluster then Step(function() MinimapCluster:EnableMouse(false) end) end
 
 	-- keep the PvP queue eye, mail and LFD eye, tucked into corners
-	if MiniMapBattlefieldFrame then
-		MiniMapBattlefieldFrame:ClearAllPoints()
-		MiniMapBattlefieldFrame:SetPoint("BOTTOMLEFT", Minimap, "BOTTOMLEFT", -4, -4)
-	end
-	if MiniMapLFGFrame then
-		MiniMapLFGFrame:ClearAllPoints()
-		MiniMapLFGFrame:SetPoint("BOTTOMRIGHT", Minimap, "BOTTOMRIGHT", 4, -4)
-	end
-	if MiniMapMailFrame then
-		MiniMapMailFrame:ClearAllPoints()
-		MiniMapMailFrame:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -4, 4)
-	end
-	if MiniMapInstanceDifficulty then
-		MiniMapInstanceDifficulty:ClearAllPoints()
-		MiniMapInstanceDifficulty:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", 4, 4)
-	end
+	Step(function()
+		if MiniMapBattlefieldFrame then
+			MiniMapBattlefieldFrame:ClearAllPoints()
+			MiniMapBattlefieldFrame:SetPoint("BOTTOMLEFT", Minimap, "BOTTOMLEFT", -4, -4)
+		end
+		if MiniMapLFGFrame then
+			MiniMapLFGFrame:ClearAllPoints()
+			MiniMapLFGFrame:SetPoint("BOTTOMRIGHT", Minimap, "BOTTOMRIGHT", 4, -4)
+		end
+		if MiniMapMailFrame then
+			MiniMapMailFrame:ClearAllPoints()
+			MiniMapMailFrame:SetPoint("TOPLEFT", Minimap, "TOPLEFT", -4, 4)
+		end
+		if MiniMapInstanceDifficulty then
+			MiniMapInstanceDifficulty:ClearAllPoints()
+			MiniMapInstanceDifficulty:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", 4, 4)
+		end
+	end)
 
 	-- the queue eye, mail, LFD eye and other addons' minimap buttons must draw ABOVE the map
 	local function RaiseIcons()
@@ -55,7 +72,7 @@ local function SetupMinimap()
 			end
 		end
 	end
-	RaiseIcons()
+	Step(RaiseIcons)
 	ns.RaiseMinimapIcons = RaiseIcons
 
 	-- wheel to zoom, right click for tracking
@@ -83,7 +100,7 @@ local function SetupMinimap()
 		local _, _, latency = GetNetStats()
 		info:SetText(date("%H:%M") .. " · " .. (latency or 0) .. " ms")
 		local n = Minimap:GetNumChildren()
-		if n ~= t.children then t.children = n; RaiseIcons() end
+		if n ~= t.children then t.children = n; pcall(RaiseIcons) end
 	end)
 	ns:Send("MINIMAP_PLACED")
 end
