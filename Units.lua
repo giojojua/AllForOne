@@ -425,9 +425,12 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	f:Place(f.trinket, 252, 0, 40, 40)
 	f.trinket:Set(ns.trinketIcon)
 
-	f.castbar = ns:CreateCastbar(f, 248, 14, { iconSize = 0, fontSize = 12, lock = false })
-	f:Place(f.castbar, 0, 96, 248, 14)
-	f.castbar:SetUnit(unit)
+	-- your own row has no cast bar: your cast shows on the main cast bar in the middle
+	if unit ~= "player" then
+		f.castbar = ns:CreateCastbar(f, 248, 14, { iconSize = 0, fontSize = 12, lock = false })
+		f:Place(f.castbar, 0, 96, 248, 14)
+		f.castbar:SetUnit(unit)
+	end
 
 	f.cds = {}
 	for i = 1, 6 do
