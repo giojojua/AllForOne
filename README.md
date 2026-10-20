@@ -80,6 +80,11 @@ A profile is a snapshot of your whole UI: where every part sits and how big it i
 - Or type `/afo profile save Arena 3v3`, `/afo profile load Arena 3v3`, `/afo profile delete Arena 3v3`, `/afo profile list`.
 - Loading a profile doesn't save your current UI first, so save it before switching if you want to keep it. Profiles can't be loaded in combat, and font / turned-off parts change after a `/reload`. Your proc list isn't part of a profile; it stays the same in all of them.
 
+### Clicking frames
+- **Left-click** any frame: target. **Shift + left-click**: set focus.
+- **Right-click** an enemy arena frame: set focus. Right-click your **focus frame**: clear focus. Right-click your own / party / raid frames: the usual menu.
+- The menus no longer have "Set Focus" / "Clear Focus": WoW blocks those for addon frames ("AllForOne has been blocked from an action only available to the Blizzard UI").
+
 ### Move and resize anything
 Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mouse wheel to resize (50–200%), right-click to put that part back. Type `/afo lock` to finish. Positions are saved per character; `/afo reset` restores the default layout. Moving only works out of combat (a game rule), and combat ends move mode automatically.
 

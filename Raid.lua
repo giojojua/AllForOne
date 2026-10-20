@@ -161,6 +161,7 @@ local function CreateHeader()
 		btn.afoStyled = true
 		if not InCombatLockdown() then
 			btn:SetAttribute("*type1", "target")
+			btn:SetAttribute("shift-type1", "focus")
 			btn:SetAttribute("*type2", "menu")
 		end
 		btn.menu = function(self) ns:RaidMenu(self) end
