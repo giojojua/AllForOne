@@ -146,6 +146,9 @@ local function Build()
 	Add(Slider(win, "Bags + menu opacity when idle", 0, 1, 0.05, function(v) return format("%d%%", v * 100 + 0.5) end,
 		function() return ns.db.menuAlpha end,
 		function(v) ns.db.menuAlpha = v; ns:Send("REFRESH_ALL") end))
+	Add(Check(win, "Range + power colors on buttons", "red = range · blue = power",
+		function() return ns.db.usableColors ~= false end,
+		function(v) ns.db.usableColors = v; ns:Send("REFRESH_ALL") end))
 	Add(Check(win, "Macro names on action buttons", nil,
 		function() return ns.db.macroNames ~= false end,
 		function(v) ns.db.macroNames = v; ns:Send("REFRESH_ALL") end))

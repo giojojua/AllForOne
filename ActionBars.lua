@@ -32,6 +32,72 @@ local function Shorten(text)
 	return strupper(text)
 end
 
+----------------------------------------------------------------------
+-- Range / power colors: the whole icon is tinted, so you see it without reading anything
+--   red   = target out of range
+--   blue  = not enough mana / rage / energy / runic power
+--   dark  = can't be used right now
+-- Works for macros too (the game resolves a macro to the spell it would cast).
+----------------------------------------------------------------------
+local ACTION_PREFIXES = { "ActionButton", "BonusActionButton", "MultiBarBottomLeftButton",
+	"MultiBarBottomRightButton", "MultiBarRightButton", "MultiBarLeftButton" }
+local TINT = {
+	range = { 0.95, 0.25, 0.25 },
+	power = { 0.30, 0.45, 1.00 },
+	unusable = { 0.35, 0.35, 0.35 },
+	normal = { 1, 1, 1 },
+}
+
+local function Tint(b)
+	local icon = b.afoIcon
+	if not icon then
+		icon = _G[b:GetName() .. "Icon"]
+		b.afoIcon = icon
+	end
+	local action = b.action
+	if not icon or not action or not HasAction(action) then return end
+	local state = "normal"
+	if ns.db.usableColors ~= false then
+		local usable, noPower = IsUsableAction(action)
+		if IsActionInRange(action) == 0 then state = "range"
+		elseif noPower then state = "power"
+		elseif not usable then state = "unusable" end
+	end
+	if b.afoTint ~= state or state ~= "normal" then
+		local c = TINT[state]
+		icon:SetVertexColor(c[1], c[2], c[3])
+		b.afoTint = state
+	end
+end
+
+function ns.SetupUsableColors()
+	local buttons = {}
+	for _, prefix in ipairs(ACTION_PREFIXES) do
+		for i = 1, 12 do
+			local b = _G[prefix .. i]
+			if b then buttons[#buttons + 1] = b end
+		end
+	end
+	-- Blizzard repaints the icon on its own updates; paint ours right after
+	if ActionButton_UpdateUsable then
+		hooksecurefunc("ActionButton_UpdateUsable", function(self) self.afoTint = nil; Tint(self) end)
+	end
+	-- range has no event: check every 0.2s (only buttons that are shown and hold something)
+	local t = CreateFrame("Frame")
+	local acc = 0
+	t:SetScript("OnUpdate", function(_, e)
+		acc = acc + e
+		if acc < 0.2 then return end
+		acc = 0
+		for _, b in ipairs(buttons) do
+			if b:IsVisible() then Tint(b) end
+		end
+	end)
+	ns:Listen("REFRESH_ALL", function()
+		for _, b in ipairs(buttons) do b.afoTint = nil; if b:IsVisible() then Tint(b) end end
+	end)
+end
+
 local macroTexts = {}
 ns:Listen("REFRESH_ALL", function()
 	for _, m in ipairs(macroTexts) do m:SetAlpha(ns.db.macroNames == false and 0 or 1) end
@@ -323,6 +389,9 @@ local function Build()
 			end
 		end
 	end)
+
+	-- 6. range + power colors on spells and macros
+	Step(ns.SetupUsableColors)
 end
 
 ns:Listen("LOGIN", function()

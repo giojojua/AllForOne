@@ -8,7 +8,7 @@
 local _, ns = ...
 
 -- settings that belong to a "UI version" (everything in the settings window)
-local KEYS = { "scale", "classColoredBars", "menuAlpha", "macroNames", "useFont", "nameplates", "raid", "actionbars", "minimap", "chat" }
+local KEYS = { "scale", "classColoredBars", "menuAlpha", "macroNames", "usableColors", "useFont", "nameplates", "raid", "actionbars", "minimap", "chat" }
 -- these only take effect after a reload
 local NEEDS_RELOAD = { useFont = true, nameplates = true, raid = true, actionbars = true, minimap = true, chat = true }
 
