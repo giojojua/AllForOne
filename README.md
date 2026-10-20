@@ -28,6 +28,10 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 ### Kill target helper (arena 2s, 3s, solo queue)
 Puts a **red cross** right next to the health % of the enemy to kill (on their frame and nameplate) and, when it matters, a **blue square** on their healer to crowd-control. When the target should change, the cross simply moves. Hover an enemy frame to see the reasons.
 - **Raises an enemy's score:** low health, PvP trinket used, big defensives on cooldown (Divine Shield, Ice Block, Cloak, Evasion, Pain Suppression, Barkskin, Shield Wall, Deterrence, Icebound Fortitude...), a class/spec with few escapes, no stun diminishing returns yet, their healer crowd-controlled. In 2s a healer next to a very tanky partner leans toward KILL; a drinking healer gets pushed up.
+- **Your team counts too:**
+  - a Priest (Mass Dispel) or Warrior (Shattering Throw) on your team makes Ice Block and Divine Shield removable: Mages and Paladins score higher, and when one of them blocks or bubbles, the cross **stays** on them and the tooltip says what to use;
+  - two or more melee on your team: cloth targets (Mage, Warlock, Priest) score higher;
+  - mostly physical team: once their Paladin's Hand of Protection is on cooldown, everyone else scores higher — and against a caster team Hand of Protection doesn't count as an immunity at all.
 - **Lowers it:** a defensive up right now. Immune (Divine Shield, Ice Block, Deterrence, Hand of Protection) means **SWAP**: the mark moves to someone else at once.
 - **CC** goes on their healer when your kill target drops under 60%.
 - It doesn't flip back and forth: a new target has to be clearly better before the mark moves.
