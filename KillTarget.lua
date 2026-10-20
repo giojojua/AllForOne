@@ -5,6 +5,9 @@
 -- What raises a score: low health, PvP trinket used, big defensives on cooldown, weak
 -- defensive kit (class/spec), no stun diminishing returns yet, their healer crowd-controlled.
 -- What lowers it: immune right now (Divine Shield, Ice Block, Deterrence...), a defensive up.
+-- Your team counts too: Mass Dispel / Shattering Throw make Ice Block and Divine Shield
+-- removable, cloth targets are better for melee teams, and Hand of Protection only matters
+-- against physical damage.
 -- It only knows what the addon can see (cooldowns, auras, health, DR) — no positioning or
 -- line of sight — so it's a strong hint, not an order.
 local _, ns = ...
@@ -109,9 +112,9 @@ local function Read(e)
 		if c and c.start and c.start + c.dur > now then e.downs[#e.downs + 1] = N(id) end
 	end
 	-- immune / defensive up right now
-	e.immune, e.reduce, e.upName = nil, 0, nil
+	e.immune, e.immuneId, e.reduce, e.upName = nil, nil, 0, nil
 	for _, id in ipairs(IMMUNE) do
-		if HasAura(u, id) then e.immune = N(id) break end
+		if HasAura(u, id) then e.immune, e.immuneId = N(id), id break end
 	end
 	for id, amount in pairs(REDUCERS) do
 		if amount > e.reduce and HasAura(u, id) then e.reduce, e.upName = amount, N(id) end
@@ -128,9 +131,54 @@ local function Bracket(n)
 end
 
 ----------------------------------------------------------------------
+-- Your team: what it's good at changes who the best kill is
+----------------------------------------------------------------------
+local MELEE_CLASS = { WARRIOR = true, ROGUE = true, DEATHKNIGHT = true }
+local MELEE_SPEC = { Retribution = true, Enhancement = true, Feral = true }
+local CASTER_CLASS = { MAGE = true, WARLOCK = true }
+local CASTER_SPEC = { Shadow = true, Elemental = true, Balance = true }
+local CLOTH = { MAGE = true, WARLOCK = true, PRIEST = true }
+local REMOVABLE = { [45438] = true, [642] = true } -- Ice Block, Divine Shield (Mass Dispel / Shattering Throw)
+
+local function MySpec()
+	local best, pts
+	for i = 1, 3 do
+		local name, _, p = GetTalentTabInfo(i)
+		if name and p and (not pts or p > pts) then best, pts = name, p end
+	end
+	return best
+end
+
+local function Team()
+	local t = { melee = 0, physical = 0, casters = 0, removers = {} }
+	for _, u in ipairs({ "player", "party1", "party2", "party3", "party4" }) do
+		if U.Exists(u) then
+			local class = U.Class(u)
+			local spec = (u == "player") and MySpec() or ns.specs[U.GUID(u) or ""]
+			if not HEALER_SPECS[spec or ""] then
+				if MELEE_CLASS[class] or MELEE_SPEC[spec or ""] then
+					t.melee = t.melee + 1
+					t.physical = t.physical + 1
+				elseif class == "HUNTER" then
+					t.physical = t.physical + 1
+				elseif CASTER_CLASS[class] or CASTER_SPEC[spec or ""] then
+					t.casters = t.casters + 1
+				end
+			end
+			-- abilities that remove Ice Block / Divine Shield
+			if class == "PRIEST" then t.removers[#t.removers + 1] = N(32375) end   -- Mass Dispel
+			if class == "WARRIOR" then t.removers[#t.removers + 1] = N(64382) end  -- Shattering Throw
+		end
+	end
+	t.canRemove = #t.removers > 0
+	t.mostlyPhysical = t.physical > t.casters
+	return t
+end
+
+----------------------------------------------------------------------
 -- Scoring
 ----------------------------------------------------------------------
-local function Score(e, enemies)
+local function Score(e, enemies, team)
 	local reasons = {}
 	local base = BASE[e.class or ""] or { _ = 15 }
 	local s = base[e.spec or "_"] or base._
@@ -158,8 +206,47 @@ local function Score(e, enemies)
 		s = s + e.history.bonus
 		if e.history.reason then reasons[#reasons + 1] = e.history.reason end
 	end
+	-- your team
+	if team then
+		-- you can strip their big immunity: it's a weaker escape than it looks
+		if team.canRemove and (e.class == "MAGE" or e.class == "PALADIN") then
+			s = s + 6
+			if not e.immune then reasons[#reasons + 1] = (e.class == "MAGE" and N(45438) or N(642)) .. " removable" end
+		end
+		-- two or more melee on your team: cloth targets melt
+		if team.melee >= 2 and CLOTH[e.class or ""] then
+			s = s + 8
+			reasons[#reasons + 1] = "cloth vs your melee"
+		end
+		-- physical team: once their paladin's Hand of Protection is gone, anyone is open
+		if team.mostlyPhysical and e.class ~= "PALADIN" then
+			for _, o in ipairs(enemies) do
+				if o.class == "PALADIN" and o.guid then
+					local c = ns.cds[o.guid] and ns.cds[o.guid][N(10278)]
+					if c and c.start and c.start + c.dur > GetTime() then
+						s = s + 8
+						reasons[#reasons + 1] = N(10278) .. " down"
+					end
+					break
+				end
+			end
+		end
+	end
 	if e.reduce > 0 then s = s - e.reduce end
-	if e.immune then s = s - 1000 end
+	-- immune right now
+	e.hardImmune, e.removableImmune = false, false
+	if e.immune then
+		if REMOVABLE[e.immuneId] and team and team.canRemove then
+			-- don't swap: remove it (the cross stays; the reason says how)
+			e.removableImmune = true
+			reasons[#reasons + 1] = e.immune .. ": " .. table.concat(team.removers, " / ")
+		elseif e.immuneId == 10278 and team and not team.mostlyPhysical then
+			-- Hand of Protection only stops physical damage: a caster team can keep going
+		else
+			s = s - 1000
+			e.hardImmune = true
+		end
+	end
 	if #reasons == 0 then reasons[1] = e.healer and "healer" or "fewest defensives" end
 	e.score, e.reasons = s, reasons
 end
@@ -268,7 +355,8 @@ local function Update()
 	local enemies = Enemies()
 	if #enemies == 0 then Clear() return end
 	for _, e in ipairs(enemies) do Read(e) end
-	for _, e in ipairs(enemies) do Score(e, enemies) end
+	local team = Team()
+	for _, e in ipairs(enemies) do Score(e, enemies, team) end
 
 	local best, current
 	for _, e in ipairs(enemies) do
@@ -277,13 +365,15 @@ local function Update()
 	end
 	local pick, swapReason = best, nil
 	if current and current ~= best then
-		if current.immune then
+		if current.removableImmune then
+			pick = current -- stay on them and strip the immunity
+		elseif current.hardImmune then
 			swapReason = current.immune .. " on #" .. current.n
 		elseif best.score < current.score + SWITCH_MARGIN then
 			pick = current -- not clearly better: don't flip-flop
 		end
 	end
-	if pick.immune then pick = nil end -- everyone immune: no call
+	if pick.hardImmune then pick = nil end -- everyone immune: no call
 
 	-- CC: their healer, when your kill target is getting low
 	local cc
