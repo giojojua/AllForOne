@@ -32,6 +32,11 @@ local function Shorten(text)
 	return strupper(text)
 end
 
+local macroTexts = {}
+ns:Listen("REFRESH_ALL", function()
+	for _, m in ipairs(macroTexts) do m:SetAlpha(ns.db.macroNames == false and 0 or 1) end
+end)
+
 local function SkinButton(b)
 	if not b or b.afoSkinned then return end
 	b.afoSkinned = true
@@ -48,8 +53,18 @@ local function SkinButton(b)
 	end
 	local nt = b:GetNormalTexture()
 	if nt then nt:SetAlpha(0) end
+	-- macro name: small, along the bottom edge of the button (can be turned off in /afo settings)
 	local macro = _G[name .. "Name"]
-	if macro then macro:SetAlpha(0) end
+	if macro then
+		ns:Font(macro, 10, true)
+		macro:ClearAllPoints()
+		macro:SetPoint("BOTTOMLEFT", 2, 2)
+		macro:SetPoint("BOTTOMRIGHT", -2, 2)
+		macro:SetJustifyH("CENTER")
+		macro:SetTextColor(1, 1, 1)
+		macro:SetAlpha(ns.db.macroNames == false and 0 or 1)
+		macroTexts[#macroTexts + 1] = macro
+	end
 	local hotkey = _G[name .. "HotKey"]
 	if hotkey then
 		ns:Font(hotkey, 10, true)
