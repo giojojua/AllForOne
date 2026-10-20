@@ -192,7 +192,7 @@ end
 ----------------------------------------------------------------------
 -- Party chat
 ----------------------------------------------------------------------
--- Messages are short on purpose:  "Kill Grimtusk Warrior"  /  "Switch Lumen Priest"
+-- Messages are short on purpose:  "Kill Warrior"  /  "Switch Priest"
 --   Kill   = the first call of the match
 --   Switch = only when YOU target the helper's new kill target (you confirm the swap)
 local lastSent, lastOther = 0, 0
@@ -215,7 +215,7 @@ ns:On("CHAT_MSG_PARTY", function(_, msg, author)
 end)
 
 local function Label(e)
-	return e.name .. " " .. (UnitClass(e.unit) or e.class or "")
+	return UnitClass(e.unit) or e.class or "?"
 end
 
 ----------------------------------------------------------------------
