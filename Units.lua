@@ -99,15 +99,21 @@ local function ShowMenu(self)
 	if dd then ToggleDropDownMenu(1, nil, dd, "cursor") end
 end
 
--- Clickable secure unit button. Left click targets, right click opens menu (or sets focus).
+-- Clickable secure unit button. Left click targets, shift + left click focuses,
+-- right click opens the menu (enemies: sets focus; your focus frame: clears focus).
 local function SecureUnit(parent, unit, w, h, rightClick)
 	local b = CreateFrame("Button", nil, parent, "SecureUnitButtonTemplate")
 	b:SetSize(w, h)
 	b.unit = unit
 	b:SetAttribute("unit", unit)
 	b:SetAttribute("*type1", "target")
+	-- shift + left click sets focus on any frame (the menus' "Set Focus" can't work for addons)
+	b:SetAttribute("shift-type1", "focus")
 	if rightClick == "focus" then
 		b:SetAttribute("*type2", "focus")
+	elseif rightClick == "clearfocus" then
+		b:SetAttribute("*type2", "macro")
+		b:SetAttribute("*macrotext2", "/clearfocus")
 	else
 		b:SetAttribute("*type2", "menu")
 		b.menu = ShowMenu
@@ -716,7 +722,7 @@ end
 Small.UpdateHealth = Small.Update
 
 local function CreateSmall(unit, w, h, holder, opts)
-	local f = SecureUnit(holder, unit, w, h)
+	local f = SecureUnit(holder, unit, w, h, opts.rightClick)
 	f:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, 0)
 	for k, v in pairs(Small) do f[k] = v end
 	f.prefix = opts.prefix
@@ -755,7 +761,25 @@ local function Holder(w, h)
 	return f
 end
 
+-- Blizzard's right-click menus contain "Set Focus" / "Clear Focus". Opened from an addon's frame,
+-- clicking them gives "AllForOne has been blocked from an action only available to the Blizzard UI"
+-- (focus is a protected action). So those entries are taken out; use shift + left click (or
+-- right-click on an enemy frame) to focus, and right-click your focus frame to clear it.
+local FOCUS_ITEMS = { SET_FOCUS = true, CLEAR_FOCUS = true, LOCK_FOCUS_FRAME = true, UNLOCK_FOCUS_FRAME = true,
+	LARGE_FOCUS = true, MOVE_FOCUS_FRAME = true, FOCUS_FRAME_BUFFS_ON_TOP = true }
+local function StripFocusFromMenus()
+	if type(UnitPopupMenus) ~= "table" then return end
+	for _, menu in pairs(UnitPopupMenus) do
+		if type(menu) == "table" then
+			for i = #menu, 1, -1 do
+				if FOCUS_ITEMS[menu[i]] then table.remove(menu, i) end
+			end
+		end
+	end
+end
+
 ns:Listen("LOGIN", function()
+	StripFocusFromMenus()
 	local F = ns.frames
 	local groupH = 5 * ROW_STRIDE - 16
 
@@ -793,7 +817,7 @@ ns:Listen("LOGIN", function()
 
 	local focus = Holder(184, 35)
 	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 154, -256)
-	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true })
+	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true, rightClick = "clearfocus" })
 
 	-- your cast bar, above the swing timer and stance/pet bars
 	local cast = ns:CreateCastbar(ns.root, 360, 18, { iconSize = 0, fontSize = 13, color = colors.player })
