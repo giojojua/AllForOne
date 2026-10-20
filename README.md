@@ -28,6 +28,12 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 ### Settings
 Type `/afo` to open the settings window (UI size, class-colored bars, menu opacity, font, which parts of the UI are on, move mode, reset, test mode, procs). It's also under **Interface → AddOns → AllForOne**. `/afo help` lists every command.
 
+### Profiles (save different versions of your UI)
+A profile is a snapshot of your whole UI: where every part sits and how big it is, plus everything in the settings window. Profiles are shared by all your characters, so you can set the UI up once and load it on an alt.
+- In the settings window (`/afo`), under **PROFILES**: type a name and press **SAVE CURRENT UI**. Saving under an existing name updates it. **LOAD** switches to a profile; **×** deletes it (click twice to confirm). The profile in use is highlighted.
+- Or type `/afo profile save Arena 3v3`, `/afo profile load Arena 3v3`, `/afo profile delete Arena 3v3`, `/afo profile list`.
+- Loading a profile doesn't save your current UI first, so save it before switching if you want to keep it. Profiles can't be loaded in combat, and font / turned-off parts change after a `/reload`. Your proc list isn't part of a profile; it stays the same in all of them.
+
 ### Move and resize anything
 Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mouse wheel to resize (50–200%), right-click to put that part back. Type `/afo lock` to finish. Positions are saved per character; `/afo reset` restores the default layout. Moving only works out of combat (a game rule), and combat ends move mode automatically.
 
@@ -45,6 +51,7 @@ Your list is saved for your account. Commands also work: `/afo procs add <name o
 |---|---|
 | `/afo` | Open the settings window |
 | `/afo help` | List every command |
+| `/afo profile save/load/delete <name>`, `/afo profile list` | Save and switch versions of your UI |
 | `/afo unlock` / `/afo lock` | Move mode on / off |
 | `/afo reset` | Put every part back to the default layout |
 | `/afo test` | Toggle sample data on every frame |

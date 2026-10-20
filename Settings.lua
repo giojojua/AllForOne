@@ -180,12 +180,126 @@ local function Build()
 	reload:SetPoint("LEFT", procs, "RIGHT", 8, 0)
 	Add(row2, 26)
 
-	win:SetHeight(y + PAD - 8)
+	----------------------------------------------------------------
+	-- Profiles: save the whole UI (layout + these settings) under a name, load it back later
+	----------------------------------------------------------------
+	y = y + 6
+	Add(Header(win, "PROFILES  (layout + settings, shared by all your characters)"), 14)
+	local saveRow = CreateFrame("Frame", nil, win)
+	saveRow:SetSize(W - 2 * PAD, 26)
+	local box = CreateFrame("EditBox", nil, saveRow)
+	box:SetSize(W - 2 * PAD - bw - 8, 26)
+	box:SetPoint("LEFT", 0, 0)
+	box:SetAutoFocus(false)
+	box:SetMaxLetters(32)
+	box:SetTextInsets(8, 8, 0, 0)
+	ns:Skin(box)
+	ns:Font(box, 14, true)
+	box.hint = Text(box, 13, false, colors.muted)
+	box.hint:SetPoint("LEFT", 8, 0)
+	box.hint:SetText("Profile name, e.g. Arena 3v3")
+	local function Hint() if box:GetText() == "" and not box:HasFocus() then box.hint:Show() else box.hint:Hide() end end
+	box:SetScript("OnEditFocusGained", Hint)
+	box:SetScript("OnEditFocusLost", Hint)
+	box:SetScript("OnTextChanged", Hint)
+	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	local function SaveNow()
+		if ns.SaveProfile and ns:SaveProfile(box:GetText()) then
+			box:SetText("")
+			box:ClearFocus()
+		end
+	end
+	box:SetScript("OnEnterPressed", SaveNow)
+	local save = Button(saveRow, "SAVE CURRENT UI", bw, SaveNow)
+	save:SetPoint("LEFT", box, "RIGHT", 8, 0)
+	Add(saveRow, 26)
+
+	local listTop = y
+	local MAX_ROWS = 8
+	local rows = {}
+	local empty = Text(win, 13, false, colors.muted)
+	empty:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -listTop - 4)
+	empty:SetText("No profiles yet. Set the UI up the way you like, name it, and save.")
+	local more = Text(win, 12, false, colors.muted)
+
+	local function Row(i)
+		if rows[i] then return rows[i] end
+		local r = CreateFrame("Frame", nil, win)
+		r:SetSize(W - 2 * PAD, 24)
+		r:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -(listTop + (i - 1) * 28))
+		r.name = Text(r, 14, true)
+		r.name:SetPoint("LEFT", 0, 0)
+		r.info = Text(r, 12, false, colors.muted)
+		r.info:SetPoint("LEFT", r.name, "RIGHT", 8, 0)
+		r.del = Button(r, "×", 26, function(self)
+			-- two clicks to delete, so a misclick can't lose a profile
+			if self.armed and GetTime() - self.armed < 3 then
+				self.armed = nil
+				ns:DeleteProfile(r.profile)
+			else
+				self.armed = GetTime()
+				self.text:SetText("SURE?")
+				self:SetWidth(56)
+			end
+		end)
+		r.del:SetPoint("RIGHT", 0, 0)
+		r.load = Button(r, "LOAD", 64, function()
+			if ns:LoadProfile(r.profile) then
+				for _, c in ipairs(controls) do c.Refresh() end
+			end
+		end)
+		r.load:SetPoint("RIGHT", r.del, "LEFT", -6, 0)
+		rows[i] = r
+		return r
+	end
+
+	function win.RefreshProfiles()
+		local list = ns.ListProfiles and ns:ListProfiles() or {}
+		for i = 1, math.max(#rows, math.min(#list, MAX_ROWS)) do
+			local p = list[i]
+			if p and i <= MAX_ROWS then
+				local r = Row(i)
+				r.profile = p.name
+				r.name:SetText(p.name)
+				if p.active then
+					r.name:SetTextColor(colors.kick[1], colors.kick[2], colors.kick[3])
+					r.info:SetText("in use · " .. (p.saved or ""))
+				else
+					r.name:SetTextColor(1, 1, 1)
+					r.info:SetText(p.saved or "")
+				end
+				r.del.armed = nil
+				r.del.text:SetText("×")
+				r.del:SetWidth(26)
+				r:Show()
+			elseif rows[i] then
+				rows[i]:Hide()
+			end
+		end
+		local shown = math.min(#list, MAX_ROWS)
+		if #list == 0 then empty:Show() else empty:Hide() end
+		if #list > MAX_ROWS then
+			more:ClearAllPoints()
+			more:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -(listTop + shown * 28))
+			more:SetText((#list - MAX_ROWS) .. " more - /afo profile list")
+			more:Show()
+		else
+			more:Hide()
+		end
+		local listH = (#list == 0) and 22 or (shown * 28 + (#list > MAX_ROWS and 18 or 0))
+		win:SetHeight(listTop + listH + PAD)
+	end
+
 	win:SetScript("OnShow", function()
 		for _, c in ipairs(controls) do c.Refresh() end
+		win.RefreshProfiles()
 	end)
 	win:Hide()
 end
+
+ns:Listen("PROFILES_CHANGED", function()
+	if win and win:IsShown() then win.RefreshProfiles() end
+end)
 
 function ns:ToggleSettings()
 	if not win then Build() end

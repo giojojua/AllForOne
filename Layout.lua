@@ -13,6 +13,23 @@ local startedTest = false
 local function CharKey()
 	return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
 end
+ns.CharKey = CharKey
+
+-- this character's saved layout (part key -> {x, y, s}); profiles copy it in and out
+function ns:GetLayout()
+	ns.db.layouts = ns.db.layouts or {}
+	return ns.db.layouts[CharKey()] or {}
+end
+
+function ns:SetLayout(t)
+	ns.db.layouts = ns.db.layouts or {}
+	ns.db.layouts[CharKey()] = t
+	ns:ApplyLayout()
+	for _, key in ipairs(order) do
+		local m = movers[key]
+		if m.overlay and m.overlay:IsShown() then m.overlay:Refresh() end
+	end
+end
 
 local function Saved()
 	ns.db.layouts = ns.db.layouts or {}
