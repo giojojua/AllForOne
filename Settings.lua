@@ -152,7 +152,7 @@ local function Build()
 
 	y = y + 6
 	Add(Header(win, "PARTS OF THE UI  (take effect after a reload)"), 14)
-	for _, m in ipairs({ { "nameplates", "Nameplates" }, { "actionbars", "Action bars, bags, menu, XP bar" },
+	for _, m in ipairs({ { "nameplates", "Nameplates" }, { "raid", "Raid frames (battlegrounds, raids)" }, { "actionbars", "Action bars, bags, menu, XP bar" },
 		{ "minimap", "Minimap" }, { "chat", "Chat cleanup" } }) do
 		Add(Check(win, m[2], nil, function() return ns.db[m[1]] end, function(v) ns.db[m[1]] = v end))
 	end
@@ -166,7 +166,7 @@ local function Build()
 	unlock:SetPoint("LEFT", 0, 0)
 	local reset = Button(row1, "RESET LAYOUT", bw, function() ns:ResetLayout() end)
 	reset:SetPoint("LEFT", unlock, "RIGHT", 8, 0)
-	local test = Button(row1, "TEST MODE", bw, function() ns:Send("TOGGLE_TEST") end)
+	local test = Button(row1, "ARENA TEST", bw, function() ns:Send("TOGGLE_TEST") end)
 	test:SetPoint("LEFT", reset, "RIGHT", 8, 0)
 	Add(row1, 26)
 	local row2 = CreateFrame("Frame", nil, win)
@@ -178,6 +178,8 @@ local function Build()
 	procs:SetPoint("LEFT", 0, 0)
 	local reload = Button(row2, "RELOAD UI", bw, function() ReloadUI() end)
 	reload:SetPoint("LEFT", procs, "RIGHT", 8, 0)
+	local bgTest = Button(row2, "BG TEST", bw, function() ns:Send("TOGGLE_TEST", "bg") end)
+	bgTest:SetPoint("LEFT", reload, "RIGHT", 8, 0)
 	Add(row2, 26)
 
 	----------------------------------------------------------------
