@@ -70,8 +70,11 @@ local function Setup(plate)
 	f:SetScale(ns.root:GetEffectiveScale() / plate:GetEffectiveScale())
 	d.frame = f
 
-	d.hp = ns:CreateBar(f, 128, 9)
+	d.hp = ns:CreateBar(f, 128, 12)
 	d.hp:SetPoint("CENTER", f, "CENTER", 0, 0)
+	-- health on enemy plates: "31.2k · 74%" inside the bar
+	d.hpText = ns:CreateText(d.hp, 10, true, "RIGHT")
+	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -3, 0)
 
 	d.name = ns:CreateText(f, 13, true, "LEFT")
 	d.name:SetPoint("BOTTOMLEFT", d.hp, "TOPLEFT", 0, 3)
@@ -188,6 +191,12 @@ local function TotemIcon(name)
 	return ns.Totems[name] or ns.Totems[(name:gsub("%s+[IVX]+$", ""))]
 end
 
+local function ShortHP(n)
+	if n >= 1e6 then return format("%.1fm", n / 1e6) end
+	if n >= 1e3 then return format("%.1fk", n / 1e3) end
+	return tostring(floor(n))
+end
+
 local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.isTotem = true
 	d.hp:SetSize(64, 5)
@@ -211,6 +220,7 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.classIcon:Show()
 	d.name:SetText("")
 	d.num:SetText("")
+	d.hpText:SetText("")
 	d.castbar:Hide()
 	for _, pip in ipairs(d.pips) do pip:Hide() end
 	for _, icon in ipairs(d.mine) do icon:Clear() end
@@ -250,8 +260,9 @@ local function UpdatePlate(plate, d)
 	end
 
 	-- size + color
-	local w, h = 128, 9
-	if friendly then w, h = 90, 5 elseif isTarget then w, h = 150, 11 end
+	-- enemy bars are tall enough to carry health text; friendly plates stay thin
+	local w, h = 128, 12
+	if friendly then w, h = 90, 5 elseif isTarget then w, h = 150, 14 end
 	d.hp:SetSize(w, h)
 	if friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
@@ -288,8 +299,21 @@ local function UpdatePlate(plate, d)
 	if friendly then
 		d.name:SetText("")
 		d.num:SetText("")
+		d.hpText:SetText("")
 	else
 		d.name:SetText(name or "")
+		local cur = d.health:GetValue() or 0
+		local pct = (max and max > 0) and floor(cur / max * 100 + 0.5) or 0
+		-- some servers only send percentages (max 100): then just show the %
+		if max and max > 100 then
+			d.hpText:SetText(ShortHP(cur) .. " · " .. pct .. "%")
+		else
+			d.hpText:SetText(pct .. "%")
+		end
+		if d.wasTargetFont ~= isTarget then
+			d.wasTargetFont = isTarget
+			ns:Font(d.hpText, isTarget and 11 or 10, true)
+		end
 		-- kill target helper: KILL / CC next to the arena number
 		local mark = (name and name == ns.killName and "|cffe5484dKILL|r") or (name and name == ns.ccName and "|cff3d9bffCC|r") or nil
 		local num = arena and tostring(arena) or ""

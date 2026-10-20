@@ -8,6 +8,7 @@ local colors = ns.colors
 
 local CELL_W, CELL_H, GAP = 70, 30, 3
 local cells = {}      -- every cell (secure + preview)
+local ApplyShape
 local header, holder, preview
 
 ----------------------------------------------------------------------
@@ -227,6 +228,38 @@ local function ShowPreview(on)
 end
 
 ----------------------------------------------------------------------
+-- Shape: 5 per column normally; 10 per column in 40-player battlegrounds
+-- (Alterac Valley, Isle of Conquest), so 40 players fit in 4 columns instead of 8
+----------------------------------------------------------------------
+local BIG_ZONES = { ["Alterac Valley"] = true, ["Isle of Conquest"] = true }
+local shape
+
+local function IsBigBattleground()
+	local _, kind = IsInInstance()
+	if kind ~= "pvp" then return false end
+	-- zone name (English client), or simply more than 25 players in the raid (any language)
+	return BIG_ZONES[GetRealZoneText() or ""] or ((GetNumRaidMembers and GetNumRaidMembers()) or 0) > 25
+end
+
+local queued
+ApplyShape = function()
+	if not header then return end
+	-- the game only lets addons change this out of combat: do it right after combat
+	if InCombatLockdown() then
+		if not queued then
+			queued = true
+			ns:SafeCall(function() queued = false; ApplyShape() end)
+		end
+		return
+	end
+	local perColumn = IsBigBattleground() and 10 or 5
+	if shape == perColumn then return end
+	header:SetAttribute("unitsPerColumn", perColumn)
+	header:SetAttribute("maxColumns", perColumn == 10 and 4 or 8)
+	shape = perColumn
+end
+
+----------------------------------------------------------------------
 -- Wiring
 ----------------------------------------------------------------------
 local function ForUnit(unit, method)
@@ -237,10 +270,15 @@ end
 ns:Listen("LOGIN", function()
 	if ns.db.raid == false then return end
 	holder = CreateFrame("Frame", nil, ns.root)
-	holder:SetSize(8 * CELL_W + 7 * GAP, 5 * CELL_H + 4 * GAP)
+	-- big enough for both layouts: 8 columns of 5, or (big battlegrounds) 4 columns of 10
+	holder:SetSize(8 * CELL_W + 7 * GAP, 10 * CELL_H + 9 * GAP)
 	-- under your own row on the left, where the party rows are outside raids
 	ns:Mover("raid", "RAID / BATTLEGROUND", holder, "TOPLEFT", "TOPLEFT", 180, -452)
 	CreateHeader()
+	ApplyShape()
+	for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "RAID_ROSTER_UPDATE" }) do
+		ns:On(ev, ApplyShape)
+	end
 
 	for _, ev in ipairs({ "UNIT_HEALTH", "UNIT_MAXHEALTH" }) do
 		ns:On(ev, function(_, unit) ForUnit(unit, "Paint") end)
