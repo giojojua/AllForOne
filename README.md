@@ -14,14 +14,19 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 **Reloading in combat:** WoW locks unit frames and action bars during combat, so if you `/reload` mid-fight (e.g. on a training dummy) the UI loads as soon as combat ends.
 
 ### What's on screen
-- **Left:** you, then your party, each with PvP trinket, health/power, class icon, pet bar, cast bar, key cooldowns, and dispellable / CC debuffs.
+- **Left:** you, then your party, each with PvP trinket, health/power, class icon, pet bar, cast bar, key cooldowns, and dispellable / CC debuffs. Your class resource sits right above your own frame (Death Knight runes, Shaman totems with timers, Druid mana in cat/bear form, Warlock soul shards).
+- **Who targets whom:** right of every pet bar: the icon + label of who that player is targeting (`#2` = arena 2, `YOU`), and a badge with how many of the other team are targeting them (red on your side, amber on the enemy side).
+- **Drinking:** a player who is drinking shows `DRINKING` instead of their health %.
 - **Right:** arena enemies 1–5, mirrored: spec, health/power, trinket, pet bar, cast bar, tracked cooldowns, diminishing-returns tracker. Right-click an enemy frame to set focus.
 - **Center:** target frame (cast bar, your debuffs, dispellable buffs, combo points), target of target, focus with cast bar, your cast bar. The middle of the screen stays clear for your character.
 - **Swing timer:** two thin bars under your cast bar (main hand, off hand) while you auto-attack; Auto Shot / wand Shoot for ranged. Handles dual-wield, parry haste, Heroic Strike/Cleave/Maul/Raptor Strike, Slam and haste changes.
 - **Next to your character:** proc alerts (Fingers of Frost, Hot Streak, Predator's Swiftness, …) and a loss-of-control alert when you are CC'd.
-- **Nameplates:** class colors, arena number, your debuffs, big CC from anyone, combo points; friendly plates are thin and only show dispellable CC.
+- **Nameplates:** class colors, arena number, your debuffs, big CC from anyone, combo points; friendly plates are thin and only show dispellable CC. Totems (Tremor, Grounding, Earthbind…) get half-size plates with the totem's icon.
 - **Bottom:** 3 action bars in the middle (bar 1 at the bottom, bar 2 above, bar 3 on top) with the XP/rep bar under them; stance/forms/auras above their left corner and the pet bar above their right corner; 2 vertical bars bottom-right above bags and game menu (faded until hovered). Your Blizzard keybinds keep working.
 - **Top:** arena map, bracket and match timer, big gates countdown; buffs (up to 16) and debuffs (up to 8) next to a square minimap with clock and latency.
+
+### Settings
+Type `/afo` to open the settings window (UI size, class-colored bars, menu opacity, font, which parts of the UI are on, move mode, reset, test mode, procs). It's also under **Interface → AddOns → AllForOne**. `/afo help` lists every command.
 
 ### Move and resize anything
 Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mouse wheel to resize (50–200%), right-click to put that part back. Type `/afo lock` to finish. Positions are saved per character; `/afo reset` restores the default layout. Moving only works out of combat (a game rule), and combat ends move mode automatically.
@@ -38,6 +43,8 @@ Your list is saved for your account. Commands also work: `/afo procs add <name o
 ### Commands
 | Command | What it does |
 |---|---|
+| `/afo` | Open the settings window |
+| `/afo help` | List every command |
 | `/afo unlock` / `/afo lock` | Move mode on / off |
 | `/afo reset` | Put every part back to the default layout |
 | `/afo test` | Toggle sample data on every frame |

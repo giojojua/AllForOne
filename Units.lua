@@ -42,6 +42,29 @@ function U.CreatureIcon(u)
 	return ns:CreatureIcon(u)
 end
 function U.Dead(u) if fake(u) then return false end return UnitIsDeadOrGhost(u) end
+-- Drinking (arena: someone is restoring mana). The buff is called "Drink" (spell 43183 is one of them).
+local DRINK = (GetSpellInfo and GetSpellInfo(43183)) or "Drink"
+function U.Drinking(u)
+	local f = fake(u)
+	if f then return f.drinking end
+	if ns.testing then return false end
+	return UnitAura(u, DRINK) ~= nil or UnitAura(u, "Refreshment") ~= nil
+end
+
+-- Who is this unit targeting? Returns one of the frame units (player, party1-4, arena1-5)
+-- when the target is one of them, otherwise the raw "<unit>target" token, or nil.
+local GROUP = { "player", "party1", "party2", "party3", "party4", "arena1", "arena2", "arena3", "arena4", "arena5" }
+U.GROUP = GROUP
+function U.TargetOf(u)
+	if ns.testing then return ns.fakeTargets and ns.fakeTargets[u] end
+	local t = (u == "player") and "target" or (u .. "target")
+	if not UnitExists(t) then return nil end
+	for _, g in ipairs(GROUP) do
+		if UnitExists(g) and UnitIsUnit(t, g) then return g end
+	end
+	return t
+end
+
 function U.Visible(u)
 	if fake(u) then return true end
 	if u:match("^party") then
@@ -190,8 +213,12 @@ function Row:UpdateHealth()
 	if not max or max == 0 then max = 1 end
 	self.health:SetMinMaxValues(0, max)
 	self.health:SetValue(cur or 0)
+	self.hpText:SetTextColor(1, 1, 1)
 	if U.Dead(u) then
 		self.hpText:SetText("DEAD")
+	elseif U.Drinking(u) then
+		self.hpText:SetText("DRINKING")
+		self.hpText:SetTextColor(0.45, 0.72, 1)
 	elseif u == "player" then
 		self.hpText:SetText(Short(cur) .. " · " .. floor(cur / max * 100 + 0.5) .. "%")
 	else
@@ -307,8 +334,56 @@ function Row:UpdatePet()
 	p.hp:SetText(floor((cur or 0) / max * 100 + 0.5) .. "%")
 end
 
+-- Who targets whom: right of the pet bar. [icon of who this unit targets][label]  [n]
+-- n = how many of the other team are targeting this unit (red on your side, amber on theirs).
+local targetsNow = {}
+function Row:UpdateTargets()
+	local w = self.whoFrame
+	local tgt = targetsNow[self.unit]
+	if tgt then
+		PaintClassIcon(w.icon, tgt)
+		local n = tgt:match("^arena(%d)$")
+		local label
+		if n then label = "#" .. n
+		elseif tgt == "player" then label = "YOU"
+		else label = U.Name(tgt) or "" end
+		w.label:SetText(label)
+		if U.IsPlayer(tgt) then
+			w.label:SetTextColor(ns:ClassColor(U.Class(tgt)))
+		else
+			w.label:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+		end
+		w.icon:Show()
+	else
+		w.icon:Hide()
+		w.label:SetText("")
+	end
+	local count = 0
+	local first, last = 1, 5
+	if not self.enemy then first, last = 6, 10 end
+	for i = first, last do
+		if targetsNow[GROUP[i]] == self.unit then count = count + 1 end
+	end
+	if count > 0 then
+		w.badgeText:SetText(count)
+		w.badge:Show()
+	else
+		w.badge:Hide()
+	end
+end
+
+function ns:UpdateTargets()
+	for _, g in ipairs(GROUP) do
+		targetsNow[g] = U.Exists(g) and U.TargetOf(g) or nil
+	end
+	if not ns.frames.team then return end
+	for _, f in ipairs(ns.frames.team) do if f:IsShown() then f:UpdateTargets() end end
+	for _, f in ipairs(ns.frames.arena) do if f:IsShown() then f:UpdateTargets() end end
+end
+
 function Row:Update()
 	if not U.Exists(self.unit) then return end
+	self:UpdateTargets()
 	self:UpdateName()
 	self:UpdateHealth()
 	self:UpdatePower()
@@ -374,6 +449,27 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	end
 
 	if enemy then f.ring = CreateRing(f, 2) end
+
+	-- who this unit is targeting + how many of the other team target it (right of the pet bar)
+	local w = CreateFrame("Frame", nil, f)
+	f:Place(w, 188, 44, 60, 14)
+	w.icon = ns:CreateIcon(w, 14)
+	w.icon:SetPoint("LEFT", w, "LEFT", 0, 0)
+	w.label = ns:CreateText(w, 11, true, "LEFT")
+	w.label:SetPoint("LEFT", w.icon, "RIGHT", 4, 0)
+	w.label:SetWidth(26)
+	w.label:SetHeight(14)
+	w.badge = CreateFrame("Frame", nil, w)
+	w.badge:SetSize(14, 14)
+	w.badge:SetPoint("RIGHT", w, "RIGHT", 0, 0)
+	ns:Skin(w.badge)
+	local bc = enemy and colors.kick or colors.danger
+	w.badge.fill:SetTexture(bc[1], bc[2], bc[3], 1)
+	w.badgeText = ns:CreateText(w.badge, 11, true, "CENTER")
+	w.badgeText:SetPoint("CENTER", 0, 0)
+	w.badgeText:SetTextColor(enemy and 0 or 1, enemy and 0 or 1, enemy and 0 or 1)
+	w.badge:Hide()
+	f.whoFrame = w
 
 	-- Pet: smaller bar under the owner, on the class-icon side of the health bar
 	if petUnit then
@@ -726,6 +822,7 @@ ns:On("UNIT_AURA", function(_, unit)
 		if ns.frames.target then ns.frames.target:UpdateAuras() end
 	else
 		ForUnit(unit, "UpdateSide")
+		if unit ~= "targettarget" and unit ~= "focus" then ForUnit(unit, "UpdateHealth") end -- DRINKING label
 	end
 end)
 ns:On("UNIT_NAME_UPDATE", function(_, unit) ForUnit(unit, "Update") end)
@@ -733,11 +830,14 @@ ns:On("UNIT_PET", function(_, unit)
 	local owner = unit == "player" and "pet" or (unit and unit:gsub("^party", "partypet"))
 	if owner then ForUnit(owner, "Update") end
 end)
-ns:On("PLAYER_TARGET_CHANGED", function() ForUnit("target", "Update"); ForUnit("targettarget", "Update"); ns:RefreshAll() end)
+ns:On("PLAYER_TARGET_CHANGED", function() ForUnit("target", "Update"); ForUnit("targettarget", "Update"); ns:UpdateTargets(); ns:RefreshAll() end)
 ns:On("PLAYER_FOCUS_CHANGED", function() ForUnit("focus", "Update") end)
 -- your own cooldowns are read live from the game
 ns:On("SPELL_UPDATE_COOLDOWN", function() ForUnit("player", "UpdateCooldowns") end)
-ns:On("UNIT_TARGET", function(_, unit) if unit == "target" then ForUnit("targettarget", "Update") end end)
+ns:On("UNIT_TARGET", function(_, unit)
+	if unit == "target" then ForUnit("targettarget", "Update") end
+	ns:UpdateTargets()
+end)
 ns:On("UNIT_COMBO_POINTS", function()
 	if ns.frames.target then ns.frames.target:UpdateCombo(); ns.frames.target:UpdateAuras() end
 end)
@@ -762,6 +862,7 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 	acc = 0
 	if ns.frames.tot and ns.frames.tot:IsShown() then ns.frames.tot:Update() end
 	if ns.frames.team then
+		ns:UpdateTargets()
 		for _, f in ipairs(ns.frames.team) do if f:IsShown() then f:UpdateState(); f:UpdateCooldowns() end end
 		for _, f in ipairs(ns.frames.arena) do if f:IsShown() then f:UpdateState(); f:UpdateSide(); f:UpdateCooldowns() end end
 	end
