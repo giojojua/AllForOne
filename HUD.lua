@@ -428,7 +428,7 @@ local function SetupArena()
 
 	countdown = CreateFrame("Frame", nil, ns.root)
 	countdown:SetSize(400, 120)
-	ns:Mover("countdown", "GATES COUNTDOWN", countdown, "TOP", "TOP", 0, -96)
+	ns:Mover("countdown", "GATES COUNTDOWN", countdown, "TOP", "TOP", 0, -112)
 	countdown.label = ns:CreateText(countdown, 16, true, "CENTER")
 	countdown.label:SetPoint("TOP")
 	countdown.label:SetText("GATES OPEN IN")
