@@ -168,21 +168,16 @@ ns:On("UI_SCALE_CHANGED", PlaceBuffFrame)
 local loc
 
 local function CreateLoC()
+	-- big icon with the countdown on it; nothing else
 	loc = CreateFrame("Frame", nil, ns.root)
-	loc:SetSize(220, 72)
+	loc:SetSize(72, 72)
 	ns:Mover("loc", "LOSS OF CONTROL", loc, "CENTER", "CENTER", 0, 230)
 	loc.icon = ns:CreateIcon(loc, 72, 1)
-	loc.icon:SetPoint("LEFT")
+	loc.icon:SetPoint("CENTER")
 	loc.icon.timer:Hide()
 	loc.icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
-	loc.label = ns:CreateText(loc, 15, true, "LEFT")
-	loc.label:SetPoint("TOPLEFT", loc.icon, "TOPRIGHT", 14, -2)
-	loc.label:SetTextColor(colors.danger[1], colors.danger[2], colors.danger[3])
-	loc.time = ns:CreateText(loc, 44, true, "LEFT")
-	loc.time:SetPoint("LEFT", loc.icon, "RIGHT", 14, -2)
-	loc.sub = ns:CreateText(loc, 14, true, "LEFT")
-	loc.sub:SetPoint("BOTTOMLEFT", loc.icon, "BOTTOMRIGHT", 14, 2)
-	loc.sub:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+	loc.time = ns:CreateText(loc.icon.timer:GetParent(), 26, true, "CENTER") -- above the cooldown swipe
+	loc.time:SetPoint("CENTER", loc.icon, "CENTER", 0, 0)
 	loc:SetScript("OnUpdate", function(self)
 		local left = (self.expires or 0) - GetTime()
 		if self.expires and left <= 0 then self:Hide() return end
@@ -191,36 +186,12 @@ local function CreateLoC()
 	loc:Hide()
 end
 
--- Your own PvP trinket (either trinket slot) or the Human racial
-local function TrinketStatus()
-	local start, duration
-	local pvpName = GetSpellInfo(42292)
-	for slot = 13, 14 do
-		local link = GetInventoryItemLink("player", slot)
-		if link and pvpName and GetItemSpell(link) == pvpName then
-			start, duration = GetInventoryItemCooldown("player", slot)
-			break
-		end
-	end
-	if not start then
-		local emfh = GetSpellInfo(59752)
-		if emfh and GetSpellInfo(emfh) then start, duration = GetSpellCooldown(emfh) end
-	end
-	if not start then return "" end
-	if start > 0 and duration > 1.5 then
-		return "Trinket " .. ns:FormatTime(start + duration - GetTime())
-	end
-	return "Trinket ready"
-end
-
 function ns:ShowLoC(icon, cat, duration, expires)
 	if not loc then return end
 	if not icon then loc:Hide() return end
 	loc.icon:Set(icon, nil, duration, expires, true)
 	loc.icon.timer:SetText("")
-	loc.label:SetText(ns.ccLabel[cat] or "")
 	loc.expires = expires and expires > 0 and expires or nil
-	loc.sub:SetText(TrinketStatus())
 	loc:Show()
 end
 
