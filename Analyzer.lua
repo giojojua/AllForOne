@@ -67,6 +67,7 @@ local function BuildSets()
 end
 
 -- do you have a talent that makes your interrupt silence too?
+local hasSilenceTalent = false -- checked at login and when talents change, not per match
 local function HasSilenceTalent()
 	if not (GetNumTalentTabs and GetNumTalents and GetTalentInfo) then return false end
 	local want = {}
@@ -298,7 +299,7 @@ local function Begin()
 			grounded = 0, quarter = 0, broken = 0, overlap = 0 },
 		trinket = { uses = {}, held = {} },
 		defs = { used = {}, early = {} },
-		kicks = { cast = 0, landed = 0, missed = 0, silenced = 0, silenceTalent = HasSilenceTalent(), onHeal = 0, onCC = 0, onDamage = 0, reaction = {}, taken = 0, takenIntoReady = 0, lockedSchools = {} },
+		kicks = { cast = 0, landed = 0, missed = 0, silenced = 0, silenceTalent = hasSilenceTalent, onHeal = 0, onCC = 0, onDamage = 0, reaction = {}, taken = 0, takenIntoReady = 0, lockedSchools = {} },
 		dmg = { done = 0, doneOn = {}, onKill = 0, taken = 0, takenFrom = {}, burst = 0, burstAt = 0, burstSpells = {} },
 		heal = { done = 0, over = 0, received = 0 },
 		dispels = { cleanse = 0, purge = 0, enemy = 0 },
@@ -939,8 +940,18 @@ end
 ----------------------------------------------------------------------
 -- Setup
 ----------------------------------------------------------------------
+local function CheckTalents()
+	local ok, has = pcall(HasSilenceTalent)
+	hasSilenceTalent = ok and has or false
+end
+-- talent changes: spending points, a respec, or swapping dual spec
+ns:On("PLAYER_TALENT_UPDATE", CheckTalents)
+ns:On("ACTIVE_TALENT_GROUP_CHANGED", CheckTalents)
+ns:On("PLAYER_ENTERING_WORLD", CheckTalents) -- talents aren't always readable at the very first login moment
+
 ns:Listen("LOGIN", function()
 	BuildSets()
+	CheckTalents()
 	DB()
 	-- a /reload inside an arena: start recording again (the earlier part is lost)
 	if ns:InArena() then Begin() end
