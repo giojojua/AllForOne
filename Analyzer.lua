@@ -84,11 +84,47 @@ end
 ----------------------------------------------------------------------
 -- Saved data
 ----------------------------------------------------------------------
+-- history is kept per character: ns.db.analyzer.chars["Name-Realm"] = { matches, nextId }
+local function CharKey()
+	return (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+end
+
+-- matches saved before history was per character: give each one to the character who played it
+-- (you are always first in the saved team list); the rest wait for their own character to log in
+local function ClaimOld(root, d)
+	local old = root.matches
+	if not old or #old == 0 then root.matches = nil return end
+	local me, keep = UnitName("player"), {}
+	for _, m in ipairs(old) do
+		local first = m.teamInfo and m.teamInfo[1]
+		if first and first.name == me and (first.order or 0) == 0 then
+			m.id = d.nextId
+			d.nextId = d.nextId + 1
+			table.insert(d.matches, m)
+		else
+			keep[#keep + 1] = m
+		end
+	end
+	table.sort(d.matches, function(a, b) return (a.date or "") < (b.date or "") end)
+	while #d.matches > MAX_MATCHES do table.remove(d.matches, 1) end
+	root.matches = #keep > 0 and keep or nil
+	if not root.matches then root.nextId = nil end
+end
+
+local cached, cachedKey
 local function DB()
 	ns.db.analyzer = ns.db.analyzer or {}
-	local d = ns.db.analyzer
+	local root = ns.db.analyzer
+	local key = CharKey()
+	if cached and cachedKey == key and root.chars and root.chars[key] == cached then return cached end
+	root.chars = root.chars or {}
+	local d = root.chars[key] or {}
+	root.chars[key] = d
 	d.matches = d.matches or {}
 	d.nextId = d.nextId or 1
+	ClaimOld(root, d)
+	cached, cachedKey = d, key
+	A.historyCache = nil
 	return d
 end
 

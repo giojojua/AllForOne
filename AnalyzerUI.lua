@@ -1,4 +1,4 @@
--- AllForOne: arena analyzer — report window, after-match popup, /afo analyze
+-- AllForOne: arena analyzer — report window, after-match popup, /afo arena
 local _, ns = ...
 local colors = ns.colors
 local A = ns.Analyzer
@@ -510,7 +510,7 @@ local function Build()
 	local sub = ns:CreateText(win, 12, false, "LEFT")
 	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
 	sub:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	sub:SetText("Your last 50 arenas · notes are hints from what the addon can see, not a grade")
+	sub:SetText("This character's last 50 arenas · notes are hints from what the addon can see, not a grade")
 	local close = Button(win, "×", 24, function() win:Hide() end)
 	close:SetPoint("TOPRIGHT", -PAD + 4, -PAD + 4)
 	win.toggle = Button(win, "FULL REPORT", 120, function(self)
@@ -531,7 +531,7 @@ local function Build()
 	win.empty:SetPoint("TOPLEFT", 0, 0)
 	win.empty:SetWidth(W - LIST_W - 3 * PAD - BAR_W - 6)
 	win.empty:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	win.empty:SetText("No arenas recorded yet. Play an arena match and the report shows up here.\n\n/afo analyze test shows a sample report.")
+	win.empty:SetText("No arenas recorded yet. Play an arena match and the report shows up here.\n\n/afo arena test shows a sample report.")
 	win:Hide()
 end
 
@@ -588,7 +588,7 @@ end
 ns:Listen("ANALYZER_MATCH", function(m) ShowPopup(m) end)
 
 ----------------------------------------------------------------------
--- Sample report (/afo analyze test): not saved
+-- Sample report (/afo arena test): not saved
 ----------------------------------------------------------------------
 function A:Sample()
 	local _, myClass = UnitClass("player")
@@ -628,7 +628,7 @@ function A:Sample()
 end
 
 ----------------------------------------------------------------------
--- /afo analyze [test | reset]
+-- /afo arena [test | reset]
 ----------------------------------------------------------------------
 local resetAsked = 0
 function ns:AnalyzeCommand(arg)
@@ -639,11 +639,11 @@ function ns:AnalyzeCommand(arg)
 		if GetTime() - resetAsked < 10 then
 			A:Reset()
 			resetAsked = 0
-			ns:Print("arena history deleted")
+			ns:Print("arena history of this character deleted")
 			if win and win:IsShown() then A:Open() end
 		else
 			resetAsked = GetTime()
-			ns:Print("this deletes all recorded arenas - type /afo analyze reset again within 10 seconds to confirm")
+			ns:Print("this deletes all recorded arenas of this character - type /afo arena reset again within 10 seconds to confirm")
 		end
 	else
 		A:Toggle()
