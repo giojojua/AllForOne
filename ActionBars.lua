@@ -103,6 +103,45 @@ ns:Listen("REFRESH_ALL", function()
 	for _, m in ipairs(macroTexts) do m:SetAlpha(ns.db.macroNames == false and 0 or 1) end
 end)
 
+-- Equipped items (trinkets, engineering gloves...) on a button: green overlay + green edge
+local EQUIP = { 0.30, 0.90, 0.40 }
+local equipButtons = {}
+local function EquipOverlay(b)
+	local o = CreateFrame("Frame", nil, b)
+	o:SetAllPoints(b)
+	o:SetFrameLevel(b:GetFrameLevel() + 1)
+	local fill = o:CreateTexture(nil, "OVERLAY")
+	fill:SetAllPoints(o)
+	fill:SetTexture(EQUIP[1], EQUIP[2], EQUIP[3], 0.25)
+	local function Edge(p1, p2, w, h)
+		local t = o:CreateTexture(nil, "OVERLAY")
+		t:SetTexture(EQUIP[1], EQUIP[2], EQUIP[3], 0.95)
+		t:SetPoint(p1)
+		t:SetPoint(p2)
+		if w then t:SetWidth(w) else t:SetHeight(h) end
+	end
+	Edge("TOPLEFT", "TOPRIGHT", nil, 2)
+	Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 2)
+	Edge("TOPLEFT", "BOTTOMLEFT", 2)
+	Edge("TOPRIGHT", "BOTTOMRIGHT", 2)
+	o:Hide()
+	return o
+end
+local function UpdateEquip(b)
+	local o = b and b.afoEquip
+	if not o then return end
+	local action = b.action
+	if action and IsEquippedAction and HasAction(action) and IsEquippedAction(action) then o:Show() else o:Hide() end
+end
+local function UpdateAllEquip()
+	for _, b in ipairs(equipButtons) do UpdateEquip(b) end
+end
+if ActionButton_Update then hooksecurefunc("ActionButton_Update", UpdateEquip) end
+ns:On("PLAYER_EQUIPMENT_CHANGED", UpdateAllEquip)
+ns:On("ACTIONBAR_SLOT_CHANGED", UpdateAllEquip)
+ns:On("ACTIONBAR_PAGE_CHANGED", UpdateAllEquip)
+ns:On("UPDATE_BONUS_ACTIONBAR", UpdateAllEquip)
+
 local function SkinButton(b)
 	if not b or b.afoSkinned then return end
 	b.afoSkinned = true
@@ -159,11 +198,13 @@ local function SkinButton(b)
 		count:ClearAllPoints()
 		count:SetPoint("BOTTOMRIGHT", -1, 2)
 	end
+	-- Blizzard's equipped glow is a big soft texture that hardly shows on a square button: use ours
 	local border = _G[name .. "Border"]
-	if border then
-		border:ClearAllPoints()
-		border:SetPoint("TOPLEFT", -1, 1)
-		border:SetPoint("BOTTOMRIGHT", 1, -1)
+	if border then border:SetAlpha(0) end
+	if b.action ~= nil or name:find("ActionButton") or name:find("MultiBar") then
+		b.afoEquip = EquipOverlay(b)
+		equipButtons[#equipButtons + 1] = b
+		UpdateEquip(b)
 	end
 	ns:Backing(b)
 	local hl = b:GetHighlightTexture()
