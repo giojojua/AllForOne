@@ -242,8 +242,9 @@ function A:ReportLines(m, full)
 		for _, v in ipairs(k.reaction) do s = s + v end
 		avg = s / #k.reaction
 	end
-	T(format("Yours: %d used  ·  %d landed (%d heals, %d crowd control, %d damage)  ·  %d missed%s",
-		k.cast or 0, k.landed or 0, k.onHeal or 0, k.onCC or 0, k.onDamage or 0, k.missed or 0,
+	T(format("Yours: %d used  ·  %d landed (%d heals, %d crowd control, %d damage)%s  ·  %d missed%s",
+		k.cast or 0, k.landed or 0, k.onHeal or 0, k.onCC or 0, k.onDamage or 0,
+		(k.silenced or 0) > 0 and format("  ·  %d silenced (no cast to stop)", k.silenced) or "", k.missed or 0,
 		avg and format("  ·  on average %d%% into the cast", floor(avg * 100 + 0.5)) or ""))
 	T(format("On you: %d  ·  %d were long casts started while their interrupt was ready", k.taken or 0, k.takenIntoReady or 0))
 	Gap()

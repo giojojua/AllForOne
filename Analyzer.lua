@@ -15,6 +15,10 @@ ns.Analyzer = A
 -- Spell data (spell IDs -> localized names at login)
 ----------------------------------------------------------------------
 local INTERRUPTS = { 1766, 6552, 72, 2139, 57994, 47528, 19647 } -- Kick, Pummel, Shield Bash, Counterspell, Wind Shear, Mind Freeze, Spell Lock
+-- silences that come with an interrupt: talents (Improved Counterspell, Improved Kick, Gag Order)
+-- and Spell Lock. A kick that lands one of these on a target that wasn't casting is a silence, not a miss.
+local KICK_SILENCES = { 18469, 55021, 18425, 18498, 24259 }
+local SILENCE_TALENTS = { 11255, 13754, 12311 } -- Improved Counterspell, Improved Kick, Gag Order
 local ENEMY_KICKS = {
 	ROGUE = { 1766 }, WARRIOR = { 6552, 72 }, MAGE = { 2139 }, SHAMAN = { 57994 },
 	DEATHKNIGHT = { 47528, 47476 }, WARLOCK = { 19647 }, PRIEST = { 15487 }, HUNTER = { 34490 },
@@ -58,6 +62,23 @@ local function BuildSets()
 		for _, id in ipairs(ids) do IS.lifesaver[class][#IS.lifesaver[class] + 1] = Name(id) end
 	end
 	IS.grounding = Name(8177)
+	IS.kickSilence = {}
+	for _, id in ipairs(KICK_SILENCES) do IS.kickSilence[Name(id)] = true end
+end
+
+-- do you have a talent that makes your interrupt silence too?
+local hasSilenceTalent = false -- checked at login and when talents change, not per match
+local function HasSilenceTalent()
+	if not (GetNumTalentTabs and GetNumTalents and GetTalentInfo) then return false end
+	local want = {}
+	for _, id in ipairs(SILENCE_TALENTS) do want[Name(id)] = true end
+	for tab = 1, GetNumTalentTabs() do
+		for i = 1, GetNumTalents(tab) do
+			local name, _, _, _, rank = GetTalentInfo(tab, i)
+			if name and want[name] and (rank or 0) > 0 then return true end
+		end
+	end
+	return false
 end
 
 ----------------------------------------------------------------------
@@ -278,7 +299,7 @@ local function Begin()
 			grounded = 0, quarter = 0, broken = 0, overlap = 0 },
 		trinket = { uses = {}, held = {} },
 		defs = { used = {}, early = {} },
-		kicks = { cast = 0, landed = 0, missed = 0, onHeal = 0, onCC = 0, onDamage = 0, reaction = {}, taken = 0, takenIntoReady = 0, lockedSchools = {} },
+		kicks = { cast = 0, landed = 0, missed = 0, silenced = 0, silenceTalent = hasSilenceTalent, onHeal = 0, onCC = 0, onDamage = 0, reaction = {}, taken = 0, takenIntoReady = 0, lockedSchools = {} },
 		dmg = { done = 0, doneOn = {}, onKill = 0, taken = 0, takenFrom = {}, burst = 0, burstAt = 0, burstSpells = {} },
 		heal = { done = 0, over = 0, received = 0 },
 		dispels = { cleanse = 0, purge = 0, enemy = 0 },
@@ -610,6 +631,13 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, src, srcName, _, dst,
 		if FromMe(src) and dstName == IS.grounding and ns.CC[a2 or ""] and event == "SPELL_AURA_APPLIED" then
 			M.cc.grounded = M.cc.grounded + 1; M.cc.wasted = M.cc.wasted + 1
 		end
+		-- your kick silenced the target (talent / Spell Lock): it did something even with no cast to stop
+		if event == "SPELL_AURA_APPLIED" and FromMe(src) and IS.kickSilence[a2 or ""] and IsEnemy(dst) then
+			local now = Now()
+			for _, p in ipairs(M.pendingKicks) do
+				if not p.silenced and now - p.t <= 0.6 then p.silenced = true break end
+			end
+		end
 		OnCC(event, src, srcName, dst, dstName, a2)
 	elseif event == "SPELL_INTERRUPT" then
 		OnInterrupt(src, dst, a5, a6)
@@ -661,10 +689,14 @@ local function Tick()
 	if not M then return end
 	RefreshUnits()
 	local now = Now()
-	-- kicks with no interrupt after 0.6s hit nothing (target wasn't casting)
+	-- kicks with no interrupt after 0.6s: a silence (talent / Spell Lock) if one landed, otherwise a miss
 	while M.pendingKicks[1] and now - M.pendingKicks[1].t > 0.6 do
-		table.remove(M.pendingKicks, 1)
-		M.kicks.missed = M.kicks.missed + 1
+		local p = table.remove(M.pendingKicks, 1)
+		if p.silenced then
+			M.kicks.silenced = (M.kicks.silenced or 0) + 1
+		else
+			M.kicks.missed = M.kicks.missed + 1
+		end
 	end
 	if not M.start then return end
 	-- enemies: when they first got hurt (for "time to die")
@@ -793,7 +825,8 @@ function A:Analyze(m)
 	local k = m.kicks
 	-- interrupts
 	if k.missed >= 2 then
-		Add("kick_missed", format("%d of your %d interrupts missed (dodged, or the target wasn't casting)", k.missed, k.cast), 2)
+		Add("kick_missed", format("%d of your %d interrupts missed (%s)", k.missed, k.cast,
+			k.silenceTalent and "dodged, parried or hit an immunity" or "dodged, or the target wasn't casting"), 2)
 	end
 	if k.taken >= 2 and k.takenIntoReady >= 2 then
 		Add("kicked_ready", format("You were interrupted %d times; %d were long casts started while their interrupt was ready - fake-cast first", k.taken, k.takenIntoReady), 2)
@@ -892,7 +925,7 @@ function A:Trends()
 		if m.result == "win" then c.wins = c.wins + 1 end
 		t.ccOnMe = t.ccOnMe + (m.cc and m.cc.onMeTime or 0)
 		t.kicksCast = t.kicksCast + (m.kicks and m.kicks.cast or 0)
-		t.kicksLanded = t.kicksLanded + (m.kicks and m.kicks.landed or 0)
+		t.kicksLanded = t.kicksLanded + (m.kicks and ((m.kicks.landed or 0) + (m.kicks.silenced or 0)) or 0)
 		if last10[i] then
 			local seen = {}
 			for _, n in ipairs(m.notes or {}) do
@@ -907,8 +940,18 @@ end
 ----------------------------------------------------------------------
 -- Setup
 ----------------------------------------------------------------------
+local function CheckTalents()
+	local ok, has = pcall(HasSilenceTalent)
+	hasSilenceTalent = ok and has or false
+end
+-- talent changes: spending points, a respec, or swapping dual spec
+ns:On("PLAYER_TALENT_UPDATE", CheckTalents)
+ns:On("ACTIVE_TALENT_GROUP_CHANGED", CheckTalents)
+ns:On("PLAYER_ENTERING_WORLD", CheckTalents) -- talents aren't always readable at the very first login moment
+
 ns:Listen("LOGIN", function()
 	BuildSets()
+	CheckTalents()
 	DB()
 	-- a /reload inside an arena: start recording again (the earlier part is lost)
 	if ns:InArena() then Begin() end
