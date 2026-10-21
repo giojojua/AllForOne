@@ -40,7 +40,7 @@ Puts a **red cross** right next to the health % of the enemy to kill (on their f
 - It's a strong hint, not an order: it can't see positioning or line of sight, and the enemy spec is only known once they cast something spec-specific.
 
 ### Arena analyzer
-Every arena you play is recorded from the combat log. When the match ends a small popup shows the result and how many notes there are; **OPEN REPORT** (or `/afo analyze`) opens the full report. Your **last 50 arenas** are kept; older ones are deleted automatically.
+Every arena you play is recorded from the combat log. When the match ends a small popup shows the result and how many notes there are; **OPEN REPORT** (or `/afo arena`) opens the report. Each character keeps its own history: the **last 50 arenas** of the character you're playing; older ones are deleted automatically.
 
 **The report**
 - **Notes** — likely mistakes, most important first:
@@ -61,7 +61,7 @@ Every arena you play is recorded from the combat log. When the match ends a smal
 
 **Enemy history** — the analyzer remembers what each enemy player did in your stored matches (died first, wasted trinket, died with defensives up, used defensives early). Once you've faced someone twice, the kill target helper gives them a bonus and shows why (`died first 3/4`), and a note appears under known enemies (`faced 5× · died first 4×`). Newer games count more; since it's built from the stored 50 matches, it ages out with them.
 
-`/afo analyze test` shows a sample report; `/afo analyze reset` (twice) deletes the history. Settings: ARENA → *Arena analyzer* and *Report popup after each arena*.
+`/afo arena test` shows a sample report; `/afo arena reset` (twice) deletes this character's history. Settings: ARENA → *Arena analyzer* and *Report popup after each arena*.
 
 Limits: only what the combat log shows within about 50 yards; no line of sight or positioning; notes are hints, not a grade.
 
@@ -110,7 +110,7 @@ Your list is saved for your account. Commands also work: `/afo procs add <name o
 | `/afo` | Open the settings window |
 | `/afo help` | List every command |
 | `/afo profile save/load/delete <name>`, `/afo profile list` | Save and switch versions of your UI |
-| `/afo analyze` | Arena analyzer (last 50 matches); `test` = sample report, `reset` = delete history |
+| `/afo arena` | Arena analyzer (this character's last 50 matches); `test` = sample report, `reset` = delete this character's history |
 | `/afo unlock` / `/afo lock` | Move mode on / off |
 | `/afo reset` | Put every part back to the default layout |
 | `/afo test` | Toggle sample arena data on every frame |
