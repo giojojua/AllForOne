@@ -168,16 +168,16 @@ ns:On("UI_SCALE_CHANGED", PlaceBuffFrame)
 local loc
 
 local function CreateLoC()
-	-- big icon, countdown under it; nothing else
+	-- big icon with the countdown on it; nothing else
 	loc = CreateFrame("Frame", nil, ns.root)
-	loc:SetSize(72, 100)
+	loc:SetSize(72, 72)
 	ns:Mover("loc", "LOSS OF CONTROL", loc, "CENTER", "CENTER", 0, 230)
 	loc.icon = ns:CreateIcon(loc, 72, 1)
-	loc.icon:SetPoint("TOP")
+	loc.icon:SetPoint("CENTER")
 	loc.icon.timer:Hide()
 	loc.icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
-	loc.time = ns:CreateText(loc, 24, true, "CENTER")
-	loc.time:SetPoint("TOP", loc.icon, "BOTTOM", 0, -4)
+	loc.time = ns:CreateText(loc.icon.timer:GetParent(), 26, true, "CENTER") -- above the cooldown swipe
+	loc.time:SetPoint("CENTER", loc.icon, "CENTER", 0, 0)
 	loc:SetScript("OnUpdate", function(self)
 		local left = (self.expires or 0) - GetTime()
 		if self.expires and left <= 0 then self:Hide() return end
