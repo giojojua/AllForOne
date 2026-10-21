@@ -91,6 +91,7 @@ ns.defaults = {
 	scale = 1,              -- extra scale on top of the 1080p layout
 	classColoredBars = true, -- false = dark bars with class-colored names
 	menuAlpha = 0.6,        -- idle opacity of bags + game menu
+	chatAlpha = 0.4,        -- dark background behind the chat text (0 = none)
 	macroNames = true,      -- macro names on action buttons
 	killHelper = true,      -- arena kill target helper (KILL / CC markers)
 	announceKill = true,    -- announce kill target changes in party chat

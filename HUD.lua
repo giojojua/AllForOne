@@ -602,6 +602,22 @@ local function ChatScrollBar(cf)
 	Sync()
 end
 
+-- dark panel behind the chat text, always on (Blizzard's own background only shows on mouseover)
+local chatBgs = {}
+local function ChatBackground(cf)
+	if cf.afoBg then return end
+	local bg = CreateFrame("Frame", nil, cf)
+	bg:SetFrameLevel(math.max(0, cf:GetFrameLevel() - 1))
+	bg:SetPoint("TOPLEFT", cf, "TOPLEFT", -6, 6)
+	bg:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT", 14, -6) -- covers the scroll bar too
+	bg.tex = bg:CreateTexture(nil, "BACKGROUND")
+	bg.tex:SetAllPoints()
+	bg.tex:SetTexture(0, 0, 0, 1)
+	bg:SetAlpha(ns.db.chatAlpha or 0.4)
+	cf.afoBg = bg
+	chatBgs[#chatBgs + 1] = bg
+end
+
 local function SetupChat()
 	for _, name in ipairs({ "ChatFrameMenuButton", "FriendsMicroButton", "ChatFrame1ButtonFrame" }) do
 		if _G[name] then ns:Kill(_G[name]) end
@@ -615,6 +631,8 @@ local function SetupChat()
 			local bf = _G["ChatFrame" .. i .. "ButtonFrame"]
 			if bf then ns:Kill(bf) end
 			local ok, err = pcall(ChatScrollBar, cf)
+			if not ok then ns:Report(err) end
+			ok, err = pcall(ChatBackground, cf)
 			if not ok then ns:Report(err) end
 		end
 	end
@@ -784,4 +802,5 @@ ns:Listen("LOGIN", function()
 end)
 ns:Listen("REFRESH_ALL", function()
 	if menuFrame then menuFrame:SetAlpha(ns.db.menuAlpha) end
+	for _, bg in ipairs(chatBgs) do bg:SetAlpha(ns.db.chatAlpha or 0.4) end
 end)
