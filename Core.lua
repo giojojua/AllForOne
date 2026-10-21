@@ -303,8 +303,7 @@ SlashCmdList.ALLFORONE = function(msg)
 		if ns.ProcCommand then ns:ProcCommand(rawArg) else ns:Print("the proc window needs a full game restart after updating the addon") end
 		return
 	end
-	-- /afo arena (the old /afo analyze still works)
-	if strlower(first or "") == "arena" or strlower(first or "") == "analyze" or strlower(first or "") == "analyzer" then
+	if strlower(first or "") == "arena" then
 		if ns.AnalyzeCommand then ns:AnalyzeCommand(rawArg) else ns:Print("the analyzer needs a full game restart after updating the addon") end
 		return
 	end
