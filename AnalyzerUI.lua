@@ -50,10 +50,128 @@ local function Top(tbl, n)
 end
 local RESULT = { win = "|cff4dc764WIN|r", loss = "|cffe5484dLOSS|r", draw = "|cffd9d9d9DRAW|r", left = "|cff8b8f96LEFT|r" }
 
+-- what to do instead, one line per kind of mistake
+local ADVICE = {
+	died_trinket = "Trinket the stun or fear that starts the kill when you're under half health.",
+	died_def = "Press your defensive around 40-50% health when you're being trained, not at 10%.",
+	trinket_held = "When a teammate is dying, trinket your long crowd control and go help them.",
+	trinket_early = "Keep your trinket for a long crowd control during a kill attempt.",
+	def_early = "Hold defensives until real damage is coming at you.",
+	kick_missed = "Interrupt later in the cast, and only casts you can see are real (watch for fakes).",
+	kicked_ready = "Fake-cast first (start, then move or cancel) to bait their interrupt before long casts.",
+	cc_wasted = "Check diminishing returns, Grounding Totem and Spell Reflection before you crowd-control.",
+	cc_quarter = "Wait for diminishing returns to reset (18s) before using the same crowd control again.",
+	cc_broken = "Call your crowd control target so your team stops hitting it.",
+	cc_overlap = "Chain crowd control after your teammate's ends, not on top of it.",
+	out_of_range = "Fight where your healer can see and reach you; pillar back toward them.",
+	focus_low = "Stay on the marked kill target; switch only when the red cross moves.",
+}
+A.ADVICE = ADVICE
+
+local function IsMe(name) return name and name == UnitName("player") end
+local function DeadName(d)
+	if IsMe(d.name) then return "You" end
+	return d.class and format("|cff%s%s|r", ClassHex(d.class), d.name or "?") or (d.name or "?")
+end
+local function IsHealerName(m, name)
+	for _, p in ipairs(m.teamInfo or {}) do
+		if p.name == name then return p.spec == "Holy" or p.spec == "Discipline" or p.spec == "Restoration" end
+	end
+end
+
+-- the one or two lines that explain the result
+function A:Verdict(m)
+	local out = {}
+	local first
+	if m.result == "win" then
+		for _, d in ipairs(m.deaths or {}) do if d.side == "them" then first = d break end end
+		if first then
+			local e
+			for _, x in ipairs(m.enemies or {}) do if x.name == first.name then e = x end end
+			out[1] = format("%s died first at %s%s.", DeadName(first), A.Fmt(first.t or 0),
+				(e and e.ttd) and format(" (went down in %ds)", floor(e.ttd + 0.5)) or "")
+			if e and (e.trinkets or 0) == 0 then out[2] = "They never used their PvP trinket." end
+		else
+			out[1] = "Nobody died; the match ended without a kill."
+		end
+		return out
+	end
+	if m.result ~= "loss" then
+		out[1] = m.result == "draw" and "Draw: nobody won in time." or "You left the match before the end."
+		return out
+	end
+	for _, d in ipairs(m.deaths or {}) do if d.side == "us" then first = d break end end
+	if not first then
+		out[1] = "Nobody on your team died (the match ended on time or someone left)."
+		return out
+	end
+	local r = first.recap or {}
+	local line = format("%s died first at %s", DeadName(first), A.Fmt(first.t or 0))
+	if (r.total or 0) > 0 then
+		local top = Top(r.dmg, 1)[1]
+		line = line .. format(": %s damage in 10s%s", Short(r.total), top and (", mostly " .. top.k) or "")
+	end
+	out[1] = line .. "."
+	-- why it worked: crowd control during the kill, no defensive, no trinket
+	local selfCC, healerCC
+	for _, c in ipairs(r.cc or {}) do
+		local spell, who = c:match("^(.-) on (.+)$")
+		if spell then
+			if who == "them" then selfCC = selfCC or spell
+			elseif IsHealerName(m, who) and who ~= first.name then healerCC = healerCC or format("%s (%s)", spell, who) end
+		end
+	end
+	if healerCC then out[#out + 1] = "Your healer was in " .. healerCC .. " during the kill." end
+	if selfCC then out[#out + 1] = format("%s in %s during the kill.", IsMe(first.name) and "You were" or "They were", selfCC) end
+	if #(r.cds or {}) == 0 and not r.trinket and #out < 3 then
+		out[#out + 1] = (IsMe(first.name) and "You" or "They") .. " used no defensive or trinket in those 10 seconds."
+	end
+	return out
+end
+
+-- the serious mistakes only (heavy notes), one per kind, at most 3
+function A:Fixes(m)
+	local out, seen = {}, {}
+	for _, n in ipairs(m.notes or {}) do
+		if (n.w or 1) >= 2 and not seen[n.kind] then
+			seen[n.kind] = true
+			out[#out + 1] = { text = n.text, fix = ADVICE[n.kind] }
+			if #out == 3 then break end
+		end
+	end
+	return out
+end
+
+local function CompactLines(m)
+	local L = {}
+	local function H(t) L[#L + 1] = { text = t, header = true } end
+	local function T(t, muted) L[#L + 1] = { text = t, muted = muted } end
+	local function Gap() L[#L + 1] = { gap = true } end
+	L[#L + 1] = { text = format("%s  ·  %s  ·  %s", RESULT[m.result or "left"] or "?", m.map or "?", A.Fmt(m.duration or 0)), title = true }
+	local them = {}
+	for _, e in ipairs(m.enemies or {}) do them[#them + 1] = Who(e) end
+	T("vs " .. table.concat(them, ", "), true)
+	Gap()
+	H(m.result == "win" and "WHY YOU WON" or (m.result == "loss" and "WHY YOU LOST" or "RESULT"))
+	for _, v in ipairs(A:Verdict(m)) do T(v) end
+	Gap()
+	H("FIX FIRST")
+	local fixes = A:Fixes(m)
+	if #fixes == 0 then T("No serious mistakes found.", true) end
+	for _, f in ipairs(fixes) do
+		T("• " .. f.text)
+		if f.fix then T("   |cff4dc764→|r " .. f.fix, true) end
+	end
+	return L
+end
+
 ----------------------------------------------------------------------
 -- Report text (a list of lines, also used by the tests)
 ----------------------------------------------------------------------
-function A:ReportLines(m)
+local showFull = false -- the report window starts on the short version
+function A:ReportLines(m, full)
+	if full == nil then full = showFull end
+	if not full then return CompactLines(m) end
 	local L = {}
 	local function H(t) L[#L + 1] = { text = t, header = true } end
 	local function T(t, muted) L[#L + 1] = { text = t, muted = muted } end
@@ -394,6 +512,12 @@ local function Build()
 	sub:SetText("Your last 50 arenas · notes are hints from what the addon can see, not a grade")
 	local close = Button(win, "×", 24, function() win:Hide() end)
 	close:SetPoint("TOPRIGHT", -PAD + 4, -PAD + 4)
+	win.toggle = Button(win, "FULL REPORT", 120, function(self)
+		showFull = not showFull
+		self.text:SetText(showFull and "SHORT REPORT" or "FULL REPORT")
+		ShowReport(selected)
+	end)
+	win.toggle:SetPoint("RIGHT", close, "LEFT", -8, 0)
 
 	local top = 62
 	list = Scroll(win, LIST_W, H - top - PAD)
@@ -430,13 +554,18 @@ local function ShowPopup(m)
 	if ns.db.analyzerPopup == false then return end
 	if not popup then
 		popup = CreateFrame("Frame", nil, ns.root)
-		popup:SetSize(420, 34)
+		popup:SetSize(520, 50)
 		popup:SetPoint("TOP", ns.root, "TOP", 0, -160)
 		popup:SetFrameStrata("HIGH")
 		ns:Skin(popup)
 		popup.fill:SetTexture(0.04, 0.045, 0.05, 0.95)
 		popup.text = ns:CreateText(popup, 14, true, "LEFT")
-		popup.text:SetPoint("LEFT", 12, 0)
+		popup.text:SetPoint("TOPLEFT", 12, -9)
+		popup.reason = ns:CreateText(popup, 12, false, "LEFT")
+		popup.reason:SetPoint("BOTTOMLEFT", 12, 9)
+		popup.reason:SetPoint("RIGHT", -150, 0)
+		popup.reason:SetHeight(14)
+		popup.reason:SetTextColor(0.85, 0.86, 0.88)
 		popup.open = Button(popup, "OPEN REPORT", 110, function() popup:Hide(); A:Open(popup.match) end)
 		popup.open:SetPoint("RIGHT", -38, 0)
 		popup.close = Button(popup, "×", 24, function() popup:Hide() end)
@@ -447,8 +576,10 @@ local function ShowPopup(m)
 		end)
 	end
 	popup.match = m
-	local n = #(m.notes or {})
-	popup.text:SetText(format("MATCH REPORT  ·  %s  %s  ·  %d note%s", RESULT[m.result or "left"] or "?", A.Fmt(m.duration or 0), n, n == 1 and "" or "s"))
+	local fixes = A:Fixes(m)
+	popup.text:SetText(format("%s  %s  ·  %s", RESULT[m.result or "left"] or "?", A.Fmt(m.duration or 0),
+		#fixes == 0 and "no serious mistakes" or format("%d thing%s to fix", #fixes, #fixes == 1 and "" or "s")))
+	popup.reason:SetText((A:Verdict(m)[1] or ""))
 	popup.left = 30
 	popup:Show()
 end

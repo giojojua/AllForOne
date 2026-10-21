@@ -165,6 +165,7 @@ function ns:CreateIcon(parent, size, timerSize)
 	local overlay = CreateFrame("Frame", nil, f)
 	overlay:SetAllPoints(f)
 	overlay:SetFrameLevel(f.cd:GetFrameLevel() + 2)
+	f.overlay = overlay
 	f.timer = ns:CreateText(overlay, timerSize or math.max(11, floor(size * 0.42)), true, "CENTER")
 	f.timer:SetPoint("CENTER", 0, 0)
 	f.count = ns:CreateText(overlay, math.max(10, floor(size * 0.38)), true, "RIGHT")

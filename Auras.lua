@@ -176,7 +176,7 @@ local function CreateLoC()
 	loc.icon:SetPoint("CENTER")
 	loc.icon.timer:Hide()
 	loc.icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
-	loc.time = ns:CreateText(loc.icon.timer:GetParent(), 26, true, "CENTER") -- above the cooldown swipe
+	loc.time = ns:CreateText(loc.icon.overlay, 26, true, "CENTER") -- above the cooldown swipe
 	loc.time:SetPoint("CENTER", loc.icon, "CENTER", 0, 0)
 	loc:SetScript("OnUpdate", function(self)
 		local left = (self.expires or 0) - GetTime()
