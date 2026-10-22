@@ -208,7 +208,10 @@ local Cast = {}
 function Cast:Paint()
 	local c
 	if self.failed then
-		c = colors.danger
+		-- the bar holds for a moment after the cast ends: green if it went through, red if not
+		c = (self.result == "ok") and (colors.castOk or colors.friendly) or (colors.castFail or colors.danger)
+	elseif self.showResult then
+		c = self.baseColor or colors.kick -- your own bar: one color while casting or channeling
 	elseif self.notInterruptible then
 		c = colors.locked
 	elseif self.channel then
@@ -260,7 +263,7 @@ function Cast:Begin()
 		channel = name and true or false
 	end
 	if not name then self:Stop() return end
-	self.failed = nil
+	self.failed, self.result, self.succeeded = nil, nil, nil
 	self.channel = channel
 	self.notInterruptible = notInt and true or false
 	self.startTime = startMS / 1000
@@ -273,8 +276,32 @@ function Cast:Begin()
 	CastOnUpdate(self)
 end
 
+-- your own bar: show for a moment how the cast ended (green = went through, red = canceled / failed)
+function Cast:Finish(ok, label)
+	self.failed = GetTime() + 0.5
+	self.result = ok and "ok" or "fail"
+	self.endTime = nil
+	self.bar:SetValue(1)
+	self.bar:Show()
+	if label then self.spell:SetText(label) end
+	self.time:SetText("")
+	self:Paint()
+	self:SetScript("OnUpdate", CastOnUpdate)
+end
+
+function Cast:Succeeded()
+	if self.showResult and self.endTime and not self.channel then self.succeeded = true end
+end
+
 function Cast:Stop()
 	if self.failed then return end
+	if self.showResult and self.endTime and self.bar:IsShown() and not self.fake then
+		local left = self.endTime - GetTime()
+		-- a cast ends with SUCCEEDED first; a channel that runs out is fine, stopped early is canceled
+		local ok = self.succeeded or (self.channel and left < 0.3)
+		self.succeeded = nil
+		return self:Finish(ok, (not ok) and "CANCELED" or nil)
+	end
 	self.endTime = nil
 	self:SetScript("OnUpdate", nil)
 	self.bar:Hide()
@@ -284,10 +311,11 @@ end
 function Cast:Interrupted(by)
 	if not self.bar:IsShown() and not by then return end
 	self.failed = GetTime() + 0.6
+	self.result = "fail"
 	self.endTime = nil
 	self.bar:SetValue(1)
 	self.bar:Show()
-	self.spell:SetText(by and ("INTERRUPTED · " .. by) or "INTERRUPTED")
+	self.spell:SetText(by and ("INTERRUPTED · " .. by) or (self.showResult and "CANCELED" or "INTERRUPTED"))
 	self.time:SetText("")
 	self:Paint()
 	self:SetScript("OnUpdate", CastOnUpdate)
@@ -366,6 +394,7 @@ function ns:CreateCastbar(parent, w, h, opts)
 		f.lock:Hide()
 	end
 	f.baseColor = opts.color
+	f.showResult = opts.showResult
 	for k, v in pairs(Cast) do f[k] = v end
 	f.bar:Hide()
 	if f.icon then f.icon:Hide() end
@@ -386,6 +415,7 @@ for _, ev in ipairs({ "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPEL
 	ns:On(ev, function(_, unit) ForUnit(unit, "StopIfDone") end)
 end
 ns:On("UNIT_SPELLCAST_INTERRUPTED", function(_, unit) ForUnit(unit, "InterruptedIfDone") end)
+ns:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit) ForUnit(unit, "Succeeded") end)
 
 -- Re-check casts when a unit token points at someone new
 local function RecheckAll(unit) ForUnit(unit, "Begin") end

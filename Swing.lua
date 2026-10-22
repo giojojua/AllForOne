@@ -18,7 +18,7 @@ local nextSwing, resetSwing = {}, {}
 local holder
 
 local function Bar(h, y, c)
-	local b = ns:CreateBar(holder, 360, h)
+	local b = ns:CreateBar(holder, 465, h)
 	b:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, y)
 	b:SetStatusBarColor(c[1], c[2], c[3])
 	b:SetMinMaxValues(0, 1)
@@ -103,8 +103,8 @@ ns:Listen("LOGIN", function()
 	ns.wandShot = GetSpellInfo(5019)
 
 	holder = CreateFrame("Frame", nil, ns.root)
-	holder:SetSize(360, 11)
-	ns:Mover("swing", "SWING TIMER", holder, "TOPLEFT", "CENTER", -180, -346)
+	holder:SetSize(465, 11) -- as wide as your cast bar and the action bars
+	ns:Mover("swing", "SWING TIMER", holder, "TOPLEFT", "CENTER", -232, -346)
 	mh = Bar(5, 0, ns.colors.text)
 	oh = Bar(4, -7, ns.colors.muted)
 	lastMain, lastOff = UnitAttackSpeed("player")

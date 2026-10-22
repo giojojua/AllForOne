@@ -832,7 +832,7 @@ ns:Listen("LOGIN", function()
 
 	-- your cast bar, above the swing timer and stance/pet bars: as wide as the action bars
 	-- (12 x 36px buttons + 3px gaps = 465px), spell icon on the left
-	local cast = ns:CreateCastbar(ns.root, 465, 24, { iconSize = 24, fontSize = 14, color = colors.player })
+	local cast = ns:CreateCastbar(ns.root, 465, 24, { iconSize = 24, fontSize = 14, color = colors.player, showResult = true })
 	ns:Mover("cast", "YOUR CAST BAR", cast, "TOPLEFT", "CENTER", -232, -320)
 	cast:SetUnit("player")
 	F.playerCast = cast
