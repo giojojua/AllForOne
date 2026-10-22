@@ -575,15 +575,18 @@ function Target:UpdateAuras()
 				debuffs[#debuffs + 1] = { icon = icon, count = count, dur = duration, expires = expires, cc = ns.CC[name] and true, mine = mine }
 			end
 		end
-		if UnitCanAttack("player", "target") then
-			for i = 1, 40 do
-				local name, _, icon, count, dispel, duration, expires, _, stealable = UnitAura("target", i, "HELPFUL")
-				if not name then break end
-				if stealable or dispel == "Magic" then
-					buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = expires }
-				end
-			end
+		-- every buff on the target; on enemies the ones you can purge / spellsteal come first (blue edge)
+		local enemy = UnitCanAttack("player", "target")
+		for i = 1, 40 do
+			local name, _, icon, count, dispel, duration, expires, _, stealable = UnitAura("target", i, "HELPFUL")
+			if not name then break end
+			local purge = enemy and (stealable or dispel == "Magic") and true or false
+			buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = (expires and expires > 0) and expires or nil, purge = purge }
 		end
+		table.sort(buffs, function(a, b)
+			if a.purge ~= b.purge then return a.purge end
+			return (a.expires or 1e9) < (b.expires or 1e9) -- short ones first, permanent ones last
+		end)
 	end
 	-- crowd control first, then yours by time left
 	table.sort(debuffs, function(a, b)
@@ -604,7 +607,11 @@ function Target:UpdateAuras()
 		local a = buffs[i]
 		if a then
 			icon:Set(a.icon, a.count, a.dur, a.expires)
-			icon:SetBorder(colors.dispel.Magic[1], colors.dispel.Magic[2], colors.dispel.Magic[3])
+			if a.purge then
+				icon:SetBorder(colors.dispel.Magic[1], colors.dispel.Magic[2], colors.dispel.Magic[3])
+			else
+				icon:SetBorder()
+			end
 		else
 			icon:Clear()
 		end
@@ -667,10 +674,12 @@ local function CreateTarget(holder)
 	f.castbar:SetPoint("TOPLEFT", f.power, "BOTTOMLEFT", 0, -3)
 	f.castbar:SetUnit("target")
 
+	-- buffs under the cast bar: two rows of 8
 	f.buffs = {}
-	for i = 1, 8 do
+	for i = 1, 16 do
 		local icon = ns:CreateIcon(f, 20, 10)
-		icon:SetPoint("TOPLEFT", f.castbar, "BOTTOMLEFT", (i - 1) * 23, -4)
+		local col, row = (i - 1) % 8, floor((i - 1) / 8)
+		icon:SetPoint("TOPLEFT", f.castbar, "BOTTOMLEFT", col * 23, -4 - row * 23)
 		f.buffs[i] = icon
 	end
 
