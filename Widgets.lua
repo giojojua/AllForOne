@@ -87,14 +87,22 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 	if elapsedAcc < 0.1 then return end
 	elapsedAcc = 0
 	local now = GetTime()
+	local done
 	for icon in pairs(timed) do
 		local left = icon.expires - now
 		if left <= 0 then
+			done = done or {}
+			done[#done + 1] = icon
+		else
+			icon.timer:SetText(ns:FormatTime(left))
+		end
+	end
+	-- after the loop: onExpire may start new timers (changing the table while looping over it errors)
+	if done then
+		for _, icon in ipairs(done) do
 			timed[icon] = nil
 			icon.timer:SetText("")
 			if icon.onExpire then icon:onExpire() end
-		else
-			icon.timer:SetText(ns:FormatTime(left))
 		end
 	end
 end)
