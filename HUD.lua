@@ -660,8 +660,38 @@ local function Bracket()
 	return ""
 end
 
+-- Battlegrounds: the score (time remaining, flags, bases) sits at the top center too, so the
+-- gates countdown goes right under it instead of on top of it.
+local function LowestScoreLine()
+	local lowest, bottom
+	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 10) do
+		local f = _G["AlwaysUpFrame" .. i]
+		if f and f:IsVisible() then
+			local b = f:GetBottom()
+			if b and (not bottom or b < bottom) then lowest, bottom = f, b end
+		end
+	end
+	return lowest or (WorldStateAlwaysUpFrame and WorldStateAlwaysUpFrame:IsVisible() and WorldStateAlwaysUpFrame) or nil
+end
+
+local function StatusUnderScore()
+	local anchor = LowestScoreLine()
+	if not anchor then return end
+	if status.underScore == anchor then return end
+	status.underScore = anchor
+	status:ClearAllPoints()
+	status:SetPoint("TOP", anchor, "BOTTOM", 0, -8)
+end
+
+local function StatusBackToLayout()
+	if not status.underScore then return end
+	status.underScore = nil
+	ns:ApplyLayout()
+end
+
 local function SetupArena()
 	status = CreateFrame("Frame", nil, ns.root)
+	ns.arenaStatus = status
 	status:SetSize(300, 30)
 	ns:Mover("arenastatus", "ARENA TIMER", status, "TOP", "TOP", 0, -45)
 	ns:Skin(status)
@@ -689,13 +719,17 @@ local function SetupArena()
 		if gatesAt and gatesAt > now then
 			local left = ceil(gatesAt - now)
 			status.time:SetText(format("|cfff2b33dGATES %d:%02d|r", floor(left / 60), left % 60))
-			if kind == "pvp" and not status:IsShown() then
-				status.map:SetText(strupper(GetRealZoneText() or ""))
-				status:Show()
+			if kind == "pvp" then
+				if not status:IsShown() then
+					status.map:SetText(strupper(GetRealZoneText() or ""))
+					status:Show()
+				end
+				StatusUnderScore()
 			end
 		else
 			-- battlegrounds: the bar is only there for the gates countdown
 			if kind == "pvp" and status:IsShown() and not ns.testing then status:Hide() end
+			if kind ~= "pvp" or not status:IsShown() then StatusBackToLayout() end
 			if gatesAt and not matchStart then matchStart = gatesAt end
 			if matchStart then
 				local t = now - matchStart
