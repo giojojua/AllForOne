@@ -73,8 +73,10 @@ local function Start(mode)
 		{ icon = Icon(10890), dur = 8, expires = now + 5, cc = true },
 	}
 	ns.fakeTargetBuffs = {
-		{ icon = Icon(48932) },
-		{ icon = Icon(53601) },
+		{ icon = Icon(48932), purge = true },              -- Blessing of Might: purgeable (blue edge)
+		{ icon = Icon(53601), purge = true },              -- Sacred Shield
+		{ icon = Icon(54043) },                            -- Retribution Aura: not purgeable, no edge
+		{ icon = Icon(19746) },                            -- Concentration Aura
 	}
 	ns.fakeCombo = 3
 	-- who targets whom: two of you on the Paladin, Warrior on you, DK on your Priest
