@@ -301,6 +301,10 @@ SLASH_ALLFORONE2 = "/allforone"
 SlashCmdList.ALLFORONE = function(msg)
 	local raw = strtrim(msg or "")
 	local first, rawArg = strsplit(" ", raw, 2)
+	if strlower(first or "") == "quests" then
+		if ns.QuestDebug then ns:QuestDebug() end
+		return
+	end
 	if strlower(first or "") == "procs" then
 		if ns.ProcCommand then ns:ProcCommand(rawArg) else ns:Print("the proc window needs a full game restart after updating the addon") end
 		return
