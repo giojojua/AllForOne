@@ -150,7 +150,7 @@ end
 local function PlateUnit(name, isTarget, arena)
 	if isTarget then return "target" end
 	if arena then return "arena" .. arena end
-	for _, u in ipairs({ "focus", "mouseover" }) do
+	for _, u in ipairs({ "focus", "mouseover", "party1", "party2", "party3", "party4" }) do
 		if UnitExists(u) and UnitName(u) == name then return u end
 	end
 end
@@ -266,9 +266,9 @@ local function UpdatePlate(plate, d)
 	end
 
 	-- size + color
-	-- enemy bars are tall enough to carry health text; friendly plates stay thin
+	-- same size for friends and enemies (bigger when targeted); friends are always green
 	local w, h = 128, 12
-	if friendly then w, h = 90, 5 elseif isTarget then w, h = 150, 14 end
+	if isTarget then w, h = 150, 14 end
 	d.hp:SetSize(w, h)
 	if friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
@@ -280,7 +280,7 @@ local function UpdatePlate(plate, d)
 	ns:SetHighlight(d.hp, isTarget)
 
 	-- icon on the left for everyone: class icon for players, creature-type icon for NPCs
-	local size = friendly and 14 or (isTarget and 24 or 20)
+	local size = isTarget and 24 or 20
 	d.classIcon:SetSize(size, size)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if not coords and unit and UnitIsPlayer(unit) then
@@ -301,13 +301,8 @@ local function UpdatePlate(plate, d)
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
 
-	-- text (friendly plates stay nameless)
-	if friendly then
-		d.name:SetText("")
-		d.num:SetText("")
-		d.hpText:SetText("")
-		d.mark:Hide()
-	else
+	-- text: name above, health inside the bar (friends too; the arena number and kill marks are enemy-only)
+	do
 		d.name:SetText(name or "")
 		local cur = d.health:GetValue() or 0
 		local pct = (max and max > 0) and floor(cur / max * 100 + 0.5) or 0
@@ -322,7 +317,7 @@ local function UpdatePlate(plate, d)
 			ns:Font(d.hpText, isTarget and 11 or 10, true)
 		end
 		-- kill target helper: red cross (KILL) / blue square (CC) next to the arena number
-		local icon = (name and name == ns.killName and ns.KILL_ICON) or (name and name == ns.ccName and ns.CC_ICON) or nil
+		local icon = (not friendly) and ((name and name == ns.killName and ns.KILL_ICON) or (name and name == ns.ccName and ns.CC_ICON)) or nil
 		-- the mark sits just left of the health % inside the bar
 		if icon then
 			d.mark:SetTexture(icon)
@@ -330,7 +325,7 @@ local function UpdatePlate(plate, d)
 		else
 			d.mark:Hide()
 		end
-		d.num:SetText(arena and tostring(arena) or "")
+		d.num:SetText((not friendly and arena) and tostring(arena) or "")
 		if d.wasTarget ~= isTarget then
 			d.wasTarget = isTarget
 			ns:Font(d.name, isTarget and 14 or 13, true)
@@ -338,7 +333,7 @@ local function UpdatePlate(plate, d)
 	end
 
 	-- cast bar (Blizzard shows nameplate casts for your target)
-	if not friendly and d.cast:IsShown() then
+	if d.cast:IsShown() then
 		local cmin, cmax = d.cast:GetMinMaxValues()
 		d.castbar:SetMinMaxValues(cmin, cmax)
 		d.castbar:SetValue(d.cast:GetValue())
@@ -380,7 +375,7 @@ local function UpdatePlate(plate, d)
 	-- auras: exact from the game when the player is your target/focus/mouseover/arena unit,
 	-- otherwise from the combat-log tracker (matched by name)
 	local guid = unit and UnitGUID(unit) or (name and ns.nameToGUID[name])
-	local anchorTop = friendly and d.hp or d.name
+	local anchorTop = d.name
 	LayoutAuras(d, anchorTop, friendly, guid, unit)
 end
 
