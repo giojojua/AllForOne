@@ -724,8 +724,9 @@ local function PlaceQuests()
 		if WatchFrame:GetParent() ~= questBox then WatchFrame:SetParent(questBox) end
 		questBox:SetScrollChild(WatchFrame)
 		WatchFrame:SetScale(QUEST_SCALE)
+		-- a scroll child must have NO anchors of its own: the box places it. Anchoring it to the
+		-- box (or Blizzard anchoring it to the minimap) makes it draw outside the box = invisible.
 		WatchFrame:ClearAllPoints()
-		WatchFrame:SetPoint("TOPLEFT", questBox, "TOPLEFT", 0, 0)
 		WatchFrame:SetWidth((cw - 10) / QUEST_SCALE)
 		WatchFrame:SetHeight(QUEST_LAYOUT_H)
 	end
