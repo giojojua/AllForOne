@@ -830,9 +830,10 @@ ns:Listen("LOGIN", function()
 	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 154, -198)
 	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true, rightClick = "clearfocus" })
 
-	-- your cast bar, above the swing timer and stance/pet bars
-	local cast = ns:CreateCastbar(ns.root, 360, 18, { iconSize = 0, fontSize = 13, color = colors.player })
-	ns:Mover("cast", "YOUR CAST BAR", cast, "TOPLEFT", "CENTER", -180, -324)
+	-- your cast bar, above the swing timer and stance/pet bars: as wide as the action bars
+	-- (12 x 36px buttons + 3px gaps = 465px), spell icon on the left
+	local cast = ns:CreateCastbar(ns.root, 465, 24, { iconSize = 24, fontSize = 14, color = colors.player })
+	ns:Mover("cast", "YOUR CAST BAR", cast, "TOPLEFT", "CENTER", -232, -320)
 	cast:SetUnit("player")
 	F.playerCast = cast
 
