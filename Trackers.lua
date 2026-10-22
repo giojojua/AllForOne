@@ -207,6 +207,50 @@ local function StartCooldown(srcGUID, spellName, spellId)
 	end
 end
 
+----------------------------------------------------------------------
+-- Diminishing returns icon: if YOU have a spell in that category, the DR icon is always your
+-- spell (only the counter and timer change). Otherwise it's the last crowd control that landed.
+----------------------------------------------------------------------
+ns.myDRIcon = {} -- category -> icon of your own spell in it
+-- spells you cast whose crowd control aura has a different name
+local CAST_TO_AURA = { [11578] = 7922, [100] = 7922 } -- Charge -> Charge Stun
+local function ScanMyCC()
+	wipe(ns.myDRIcon)
+	if not (ns.CC and ns.drCategories and GetNumSpellTabs and GetSpellName) then return end
+	local alias = {}
+	for cast, aura in pairs(CAST_TO_AURA) do
+		local c, a = GetSpellInfo(cast), GetSpellInfo(aura)
+		if c and a then alias[c] = a end
+	end
+	local function Add(name, icon)
+		local cc = name and (ns.CC[name] or ns.CC[alias[name] or ""])
+		if cc and ns.drCategories[cc.cat] and not ns.myDRIcon[cc.cat] then
+			ns.myDRIcon[cc.cat] = icon or cc.icon
+		end
+	end
+	-- your spellbook
+	for tab = 1, GetNumSpellTabs() do
+		local _, _, offset, count = GetSpellTabInfo(tab)
+		for i = (offset or 0) + 1, (offset or 0) + (count or 0) do
+			local name = GetSpellName(i, BOOKTYPE_SPELL or "spell")
+			if name then Add(name, GetSpellTexture and GetSpellTexture(i, BOOKTYPE_SPELL or "spell")) end
+		end
+	end
+	-- your pet (Seduction, Spell Lock...)
+	local petCount = HasPetSpells and HasPetSpells()
+	if petCount then
+		for i = 1, petCount do
+			local name = GetSpellName(i, BOOKTYPE_PET or "pet")
+			if name then Add(name, GetSpellTexture and GetSpellTexture(i, BOOKTYPE_PET or "pet")) end
+		end
+	end
+end
+local function Rescan() local ok, err = pcall(ScanMyCC); if not ok then ns:Report(err) end end
+ns:Listen("LOGIN", Rescan)
+ns:On("SPELLS_CHANGED", Rescan)          -- learned a spell, respec, dual-spec swap
+ns:On("PET_BAR_UPDATE", Rescan)          -- pet summoned / changed
+ns:On("PLAYER_TALENT_UPDATE", Rescan)
+
 local function AuraApplied(dstGUID, spellId, spellName, mine, refresh)
 	local cc = ns.CC[spellName]
 	if not cc and not mine then return end
@@ -240,7 +284,7 @@ local function AuraApplied(dstGUID, spellId, spellName, mine, refresh)
 		s.count = s.count + 1
 		s.active = true
 		s.reset = math.huge
-		s.icon = icon
+		s.icon = ns.myDRIcon[cc.cat] or icon -- your spell if you have one in this category
 		ns:Send("DR", dstGUID)
 	end
 	ns:Send("AURAS", dstGUID)
