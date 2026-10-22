@@ -10,6 +10,69 @@ ns.plates = plates
 local childCount = 0
 local npcIcons = {} -- npc name -> creature-type icon (learned from target/mouseover/focus)
 
+-- player name -> class token, from everything that tells us a class by name:
+-- anyone you target, mouse over or focus, your party / raid, guild, friends list,
+-- the battleground scoreboard, and players seen in the combat log.
+local classByName = {}
+ns.classByName = classByName
+local function Learn(unit)
+	if unit and UnitExists(unit) and UnitIsPlayer(unit) then
+		local name = UnitName(unit)
+		local _, c = UnitClass(unit)
+		if name and c then classByName[name] = c end
+	end
+end
+local function LearnGroup()
+	for i = 1, 4 do Learn("party" .. i) end
+	for i = 1, (GetNumRaidMembers and GetNumRaidMembers() or 0) do Learn("raid" .. i) end
+end
+local LOCAL_TO_TOKEN
+local function Token(localized)
+	if not localized then return nil end
+	if not LOCAL_TO_TOKEN then
+		LOCAL_TO_TOKEN = {}
+		for token, l in pairs(LOCALIZED_CLASS_NAMES_MALE or {}) do LOCAL_TO_TOKEN[l] = token end
+		for token, l in pairs(LOCALIZED_CLASS_NAMES_FEMALE or {}) do LOCAL_TO_TOKEN[l] = token end
+	end
+	return LOCAL_TO_TOKEN[localized]
+end
+local function LearnGuild()
+	if not (IsInGuild and IsInGuild() and GetNumGuildMembers and GetGuildRosterInfo) then return end
+	for i = 1, GetNumGuildMembers(true) do
+		local name, _, _, _, class, _, _, _, _, _, token = GetGuildRosterInfo(i)
+		token = token or Token(class)
+		if name and token then classByName[name] = token end
+	end
+end
+local function LearnFriends()
+	if not (GetNumFriends and GetFriendInfo) then return end
+	for i = 1, GetNumFriends() do
+		local name, _, class = GetFriendInfo(i)
+		local token = Token(class)
+		if name and token then classByName[name] = token end
+	end
+end
+local function LearnScoreboard()
+	if not (GetNumBattlefieldScores and GetBattlefieldScore) then return end
+	for i = 1, GetNumBattlefieldScores() do
+		local name, _, _, _, _, _, _, _, _, token = GetBattlefieldScore(i)
+		if name and token then classByName[(name:match("^[^%-]+")) or name] = token end
+	end
+end
+ns:On("UPDATE_MOUSEOVER_UNIT", function() Learn("mouseover") end)
+ns:On("PLAYER_TARGET_CHANGED", function() Learn("target") end)
+ns:On("PLAYER_FOCUS_CHANGED", function() Learn("focus") end)
+ns:On("PARTY_MEMBERS_CHANGED", LearnGroup)
+ns:On("RAID_ROSTER_UPDATE", LearnGroup)
+ns:On("GUILD_ROSTER_UPDATE", LearnGuild)
+ns:On("FRIENDLIST_UPDATE", LearnFriends)
+ns:On("UPDATE_BATTLEFIELD_SCORE", LearnScoreboard)
+ns:Listen("LOGIN", function()
+	LearnGroup()
+	if GuildRoster then GuildRoster() end -- asks the server; GUILD_ROSTER_UPDATE follows
+	if ShowFriends then ShowFriends() end
+end)
+
 local function IsPlate(f)
 	if f:GetName() then return false end
 	local _, border = f:GetRegions()
@@ -269,7 +332,10 @@ local function UpdatePlate(plate, d)
 			if c then kind, class = playerKind, c end
 		elseif (friendly or not class) and name and ns.nameToGUID[name] and GetPlayerInfoByGUID then
 			local _, c = GetPlayerInfoByGUID(ns.nameToGUID[name])
-			if c then kind, class = playerKind, c end
+			if c then kind, class = playerKind, c; classByName[name] = c end
+		end
+		if (friendly or not class) and not (u and UnitIsPlayer(u)) and name and classByName[name] then
+			kind, class = playerKind, classByName[name]
 		end
 	end
 
