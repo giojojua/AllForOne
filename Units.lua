@@ -816,16 +816,18 @@ ns:Listen("LOGIN", function()
 	end
 
 	-- center column, positions from the 1920x1080 design relative to screen center
+	-- (target, target of target and focus sit higher so the target's two buff rows end well
+	-- above your cast bar; the keep-clear box around your character is smaller to make room)
 	local target = Holder(244, 44)
-	ns:Mover("target", "TARGET", target, "TOPLEFT", "CENTER", -122, -218)
+	ns:Mover("target", "TARGET", target, "TOPLEFT", "CENTER", -122, -160)
 	F.target = CreateTarget(target)
 
 	local tot = Holder(96, 20)
-	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 154, -226)
+	ns:Mover("tot", "TARGET OF TARGET", tot, "TOPLEFT", "CENTER", 154, -168)
 	F.tot = CreateSmall("targettarget", 96, 20, tot, { font = 13 })
 
 	local focus = Holder(184, 35)
-	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 154, -256)
+	ns:Mover("focus", "FOCUS", focus, "TOPLEFT", "CENTER", 154, -198)
 	F.focus = CreateSmall("focus", 184, 22, focus, { font = 14, percent = true, prefix = "F · ", cast = true, rightClick = "clearfocus" })
 
 	-- your cast bar, above the swing timer and stance/pet bars
