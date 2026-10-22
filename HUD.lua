@@ -618,6 +618,43 @@ local function ChatBackground(cf)
 	chatBgs[#chatBgs + 1] = bg
 end
 
+-- The box you type in: Blizzard's textures are see-through, so it looks faded.
+-- Use a solid dark panel with a 1px edge in the color of the channel you're typing to.
+local function EditBoxEdge(eb, r, g, b)
+	if not eb.afoEdge then return end
+	for _, t in ipairs(eb.afoEdge) do t:SetTexture(r, g, b, 0.9) end
+end
+local function StyleEditBox(eb)
+	if not eb or eb.afoStyled then return end
+	eb.afoStyled = true
+	local name = eb:GetName()
+	for _, suffix in ipairs({ "Left", "Mid", "Right", "FocusLeft", "FocusMid", "FocusRight" }) do
+		local t = _G[name .. suffix]
+		if t then t:SetAlpha(0) end
+	end
+	local bg = eb:CreateTexture(nil, "BACKGROUND")
+	bg:SetPoint("TOPLEFT", 4, -4)
+	bg:SetPoint("BOTTOMRIGHT", -4, 4)
+	bg:SetTexture(0.03, 0.035, 0.045, 0.95)
+	eb.afoEdge = {}
+	local function Edge(p1, p2, w, h)
+		local t = eb:CreateTexture(nil, "BORDER")
+		t:SetPoint(p1, bg, p1)
+		t:SetPoint(p2, bg, p2)
+		if w then t:SetWidth(w) else t:SetHeight(h) end
+		eb.afoEdge[#eb.afoEdge + 1] = t
+	end
+	Edge("TOPLEFT", "TOPRIGHT", nil, 1)
+	Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
+	Edge("TOPLEFT", "BOTTOMLEFT", 1)
+	Edge("TOPRIGHT", "BOTTOMRIGHT", 1)
+	EditBoxEdge(eb, 0.35, 0.37, 0.4)
+	local font = ns.db.useFont and media.font or media.fallback
+	eb:SetFont(font, 14, "")
+	local header = _G[name .. "Header"]
+	if header then header:SetFont(font, 14, "") end
+end
+
 local function SetupChat()
 	for _, name in ipairs({ "ChatFrameMenuButton", "FriendsMicroButton", "ChatFrame1ButtonFrame" }) do
 		if _G[name] then ns:Kill(_G[name]) end
@@ -638,6 +675,22 @@ local function SetupChat()
 	end
 	CHAT_FRAME_TAB_NORMAL_NOMOUSE_ALPHA = 0
 	CHAT_FRAME_TAB_SELECTED_NOMOUSE_ALPHA = 0
+	for i = 1, NUM_CHAT_WINDOWS or 7 do
+		local ok, err = pcall(StyleEditBox, _G["ChatFrame" .. i .. "EditBox"])
+		if not ok then ns:Report(err) end
+	end
+	if ChatFrameEditBox then pcall(StyleEditBox, ChatFrameEditBox) end -- older single edit box
+	-- full opacity while typing; edge in the channel's color (say white, party blue, whisper pink...)
+	if ChatEdit_ActivateChat then
+		hooksecurefunc("ChatEdit_ActivateChat", function(eb) if eb then eb:SetAlpha(1) end end)
+	end
+	if ChatEdit_UpdateHeader then
+		hooksecurefunc("ChatEdit_UpdateHeader", function(eb)
+			if not eb or not eb.afoEdge then return end
+			local info = ChatTypeInfo and ChatTypeInfo[eb:GetAttribute("chatType") or "SAY"]
+			if info then EditBoxEdge(eb, info.r, info.g, info.b) end
+		end)
+	end
 end
 
 ----------------------------------------------------------------------
