@@ -18,6 +18,16 @@ local INTERRUPTS = { 1766, 6552, 72, 2139, 57994, 47528, 19647 } -- Kick, Pummel
 -- silences that come with an interrupt: talents (Improved Counterspell, Improved Kick, Gag Order)
 -- and Spell Lock. A kick that lands one of these on a target that wasn't casting is a silence, not a miss.
 local KICK_SILENCES = { 18469, 55021, 18425, 18498, 24259 }
+-- Crowd control you aim at one target on purpose. Only these count for the CC mistakes
+-- (immune, reflected, grounded, quarter duration, overlap, broken). Not on the list:
+-- roots, silences, disarms, area CC that also hits an immune player next to the real target
+-- (Psychic Scream, Howl, Intimidating Shout, Dragon's Breath, Shockwave, War Stomp, Frost Nova),
+-- talent procs (Impact, Improved Hamstring, Frostbite...), and charge/intercept stuns.
+local CHECKED_CC = {
+	10308, 8643, 1833, 8983, 49802, 49803, 12809, 44572, 47481, 24394, -- stuns: HoJ, Kidney, Cheap Shot, Bash, Maim, Pounce, Concussion Blow, Deep Freeze, Gnaw, Intimidation
+	118, 28271, 28272, 61305, 61721, 61780, 51724, 1776, 51514, 20066, 49012, -- Polymorph (all), Sap, Gouge, Hex, Repentance, Wyvern Sting
+	18658, 19503, 6215, 6358, 2094, 10326, 47860, 64044, 33786, 18647, 605, -- Hibernate, Scatter Shot, Fear, Seduction, Blind, Turn Evil, Death Coil, Psychic Horror, Cyclone, Banish, Mind Control
+}
 local SILENCE_TALENTS = { 11255, 13754, 12311 } -- Improved Counterspell, Improved Kick, Gag Order
 local ENEMY_KICKS = {
 	ROGUE = { 1766 }, WARRIOR = { 6552, 72 }, MAGE = { 2139 }, SHAMAN = { 57994 },
@@ -62,6 +72,8 @@ local function BuildSets()
 		for _, id in ipairs(ids) do IS.lifesaver[class][#IS.lifesaver[class] + 1] = Name(id) end
 	end
 	IS.grounding = Name(8177)
+	IS.checkCC = {}
+	for _, id in ipairs(CHECKED_CC) do IS.checkCC[Name(id)] = true end
 	IS.kickSilence = {}
 	for _, id in ipairs(KICK_SILENCES) do IS.kickSilence[Name(id)] = true end
 end
@@ -409,6 +421,8 @@ local function OnCC(event, src, srcName, dst, dstName, spell)
 			M.ccActive[dst] = M.ccActive[dst] or {}
 			if FromMe(src) then
 				M.cc.mine = M.cc.mine + 1
+			end
+			if FromMe(src) and IS.checkCC[spell] then
 				-- overlapping a teammate's crowd control
 				for other, o in pairs(M.ccActive[dst]) do
 					if other ~= spell and not FromMe(o.src) and IsTeam(o.src) and o.expires - now > 1 then
@@ -440,7 +454,7 @@ local function OnCC(event, src, srcName, dst, dstName, spell)
 				M.cc.mineTime = M.cc.mineTime + (now - mine)
 				M.myCCOn[dst .. spell] = nil
 				-- broken within 3s by your own team's damage
-				if event ~= "SPELL_AURA_REMOVED" and now - mine < 3 and IsTeam(src) then
+				if event ~= "SPELL_AURA_REMOVED" and now - mine < 3 and IsTeam(src) and IS.checkCC[spell] then
 					M.cc.broken = M.cc.broken + 1
 				end
 			end
@@ -582,7 +596,7 @@ local function OnMissed(src, dst, dstName, spell, missType)
 		if p then M.kicks.missed = M.kicks.missed + 1 end
 		return
 	end
-	if ns.CC[spell] then
+	if IS.checkCC[spell] then
 		if missType == "IMMUNE" then M.cc.immune = M.cc.immune + 1; M.cc.wasted = M.cc.wasted + 1
 		elseif missType == "REFLECT" then M.cc.reflected = M.cc.reflected + 1; M.cc.wasted = M.cc.wasted + 1 end
 	end
@@ -655,7 +669,7 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, src, srcName, _, dst,
 		OnDamage(src, srcName, dst, dstName, nil, a1)
 	elseif event == "SPELL_DAMAGE" or event == "SPELL_PERIODIC_DAMAGE" or event == "RANGE_DAMAGE" then
 		OnDamage(src, srcName, dst, dstName, a2, a4)
-		if FromMe(src) and dstName == IS.grounding and ns.CC[a2 or ""] then M.cc.grounded = M.cc.grounded + 1; M.cc.wasted = M.cc.wasted + 1 end
+		if FromMe(src) and dstName == IS.grounding and IS.checkCC[a2 or ""] then M.cc.grounded = M.cc.grounded + 1; M.cc.wasted = M.cc.wasted + 1 end
 	elseif event == "SPELL_HEAL" or event == "SPELL_PERIODIC_HEAL" then
 		local amount, over = a4 or 0, a5 or 0
 		if FromMe(src) then M.heal.done = M.heal.done + amount; M.heal.over = M.heal.over + over end
@@ -664,7 +678,7 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, src, srcName, _, dst,
 		OnCast(src, srcName, a2)
 	elseif event == "SPELL_AURA_APPLIED" or event == "SPELL_AURA_REFRESH" or event == "SPELL_AURA_REMOVED"
 		or event == "SPELL_AURA_BROKEN" or event == "SPELL_AURA_BROKEN_SPELL" then
-		if FromMe(src) and dstName == IS.grounding and ns.CC[a2 or ""] and event == "SPELL_AURA_APPLIED" then
+		if FromMe(src) and dstName == IS.grounding and IS.checkCC[a2 or ""] and event == "SPELL_AURA_APPLIED" then
 			M.cc.grounded = M.cc.grounded + 1; M.cc.wasted = M.cc.wasted + 1
 		end
 		-- your kick silenced the target (talent / Spell Lock): it did something even with no cast to stop
