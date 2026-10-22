@@ -661,7 +661,9 @@ end
 -- quest item buttons, which the game protects in combat).
 ----------------------------------------------------------------------
 local SetupQuests
-local QUEST_TOP = 470 -- design pixels from the top of the screen: under your own frame
+local QUEST_TOP = 470   -- never higher than this (design pixels from the top): under your own frame
+local QUEST_MAX_H = 240 -- and never taller than this
+local QUEST_SCALE = 0.85
 local placingQuests = false
 local function PlaceQuests()
 	if not WatchFrame or not ChatFrame1 or placingQuests then return end
@@ -672,15 +674,16 @@ local function PlaceQuests()
 	else
 		-- only bring back what we hid ourselves (the game hides it when nothing is tracked)
 		if WatchFrame.afoHidden then WatchFrame.afoHidden = nil; WatchFrame:Show() end
+		WatchFrame:SetScale(QUEST_SCALE)
 		WatchFrame:ClearAllPoints()
-		WatchFrame:SetPoint("BOTTOMLEFT", ChatFrame1, "TOPLEFT", -4, 34) -- above the chat tabs
+		WatchFrame:SetPoint("BOTTOMLEFT", ChatFrame1, "TOPLEFT", -4, 34 / QUEST_SCALE) -- above the chat tabs
 		-- height: from the chat up to QUEST_TOP (compare in screen pixels, the frames scale differently)
 		local es, rs, cs = WatchFrame:GetEffectiveScale(), ns.root:GetEffectiveScale(), ChatFrame1:GetEffectiveScale()
 		local top = ns.root:GetTop() and (ns.root:GetTop() * rs - QUEST_TOP * rs)
-		local chatTop = ChatFrame1:GetTop() and (ChatFrame1:GetTop() * cs + 34 * es)
-		if top and chatTop then
-			WatchFrame:SetHeight(math.max(150, (top - chatTop) / es))
-		end
+		local chatTop = ChatFrame1:GetTop() and (ChatFrame1:GetTop() * cs + 34 * cs)
+		local h = QUEST_MAX_H * rs / es
+		if top and chatTop then h = math.min(h, (top - chatTop) / es) end
+		WatchFrame:SetHeight(math.max(120, h))
 	end
 	placingQuests = false
 end
