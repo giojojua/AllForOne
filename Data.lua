@@ -252,7 +252,7 @@ local specList = {
 ----------------------------------------------------------------------
 -- Proc suggestions shown in the /afo procs window (nothing is tracked until you add it)
 local procSuggestions = {
-	MAGE = { 44544, 57761, 48108, 44401 },            -- Fingers of Frost, Brain Freeze, Hot Streak, Missile Barrage
+	MAGE = { 48108, 64343, 54741, 44544, 57761, 44401, 12536 }, -- Hot Streak, Impact, Firestarter, Fingers of Frost, Brain Freeze, Missile Barrage, Clearcasting
 	DRUID = { 69369, 48517, 48518, 16870 },           -- Predator's Swiftness, Eclipse (Solar/Lunar), Clearcasting
 	WARLOCK = { 17941, 34936, 71165, 63167, 54277 },  -- Shadow Trance, Backlash, Molten Core, Decimation, Backdraft
 	PALADIN = { 59578, 54149 },                       -- The Art of War, Infusion of Light
