@@ -211,7 +211,8 @@ function Cast:Paint()
 		-- the bar holds for a moment after the cast ends: green if it went through, red if not
 		c = (self.result == "ok") and (colors.castOk or colors.friendly) or (colors.castFail or colors.danger)
 	elseif self.showResult then
-		c = self.baseColor or colors.kick -- your own bar: one color while casting or channeling
+		-- your own bar: blue while channeling, orange while casting
+		c = self.channel and colors.channel or (self.baseColor or colors.kick)
 	elseif self.notInterruptible then
 		c = colors.locked
 	elseif self.channel then
