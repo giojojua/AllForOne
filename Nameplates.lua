@@ -254,14 +254,22 @@ local function UpdatePlate(plate, d)
 
 	-- Class: ask the game directly whenever we can, the bar color is only a fallback
 	-- (it only carries class when the class-color nameplate setting is active).
-	if not friendly then
-		local unit = isTarget and "target" or (arena and ("arena" .. arena)) or nil
-		if unit and UnitIsPlayer(unit) then
-			local _, c = UnitClass(unit)
-			if c then kind, class = "enemyPlayer", c end
-		elseif not class and name and ns.nameToGUID[name] and GetPlayerInfoByGUID then
+	-- Friendly players: their bar is plain blue (no class), so look them up the same way:
+	-- your target / party / raid by name, else any player the combat log has seen.
+	do
+		local u = isTarget and "target" or (arena and ("arena" .. arena)) or (friendly and unit) or nil
+		if friendly and not u and name and kind == "friendlyPlayer" and GetNumRaidMembers then
+			for i = 1, GetNumRaidMembers() do
+				if UnitName("raid" .. i) == name then u = "raid" .. i break end
+			end
+		end
+		local playerKind = friendly and "friendlyPlayer" or "enemyPlayer"
+		if u and UnitIsPlayer(u) then
+			local _, c = UnitClass(u)
+			if c then kind, class = playerKind, c end
+		elseif (friendly or not class) and name and ns.nameToGUID[name] and GetPlayerInfoByGUID then
 			local _, c = GetPlayerInfoByGUID(ns.nameToGUID[name])
-			if c then kind, class = "enemyPlayer", c end
+			if c then kind, class = playerKind, c end
 		end
 	end
 
@@ -290,13 +298,16 @@ local function UpdatePlate(plate, d)
 	if coords then
 		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+	elseif kind == "friendlyPlayer" then
+		-- a friendly player whose class we don't know yet: no icon rather than a wrong one
+		d.classIcon:Hide()
 	else
 		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
 		if unit and not UnitIsPlayer(unit) and name then npcIcons[name] = ns:CreatureIcon(unit) end
 		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
 		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	end
-	d.classIcon:Show()
+	if coords or kind ~= "friendlyPlayer" then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
