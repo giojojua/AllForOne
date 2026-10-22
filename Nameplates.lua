@@ -298,8 +298,8 @@ local function UpdatePlate(plate, d)
 	if coords then
 		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
-	elseif kind == "friendlyPlayer" then
-		-- a friendly player whose class we don't know yet: no icon rather than a wrong one
+	elseif friendly then
+		-- friendly NPCs (vendors, guards...) and players whose class we don't know yet: no icon
 		d.classIcon:Hide()
 	else
 		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
@@ -307,7 +307,7 @@ local function UpdatePlate(plate, d)
 		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
 		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	end
-	if coords or kind ~= "friendlyPlayer" then d.classIcon:Show() end
+	if coords or not friendly then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
