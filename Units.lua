@@ -312,13 +312,11 @@ function Row:UpdateSide()
 		for i, icon in ipairs(self.side) do
 			local d = list[i]
 			if d then
-				-- the number in the middle = how many times that crowd control was used:
-				-- 1 (next one half), 2 (next one a quarter), 3 (immune). No timer; the icon
-				-- disappears when the category resets.
+				-- corner: how many times that crowd control was used - 1 (next one half),
+				-- 2 (next one a quarter), 3 (immune). Middle: seconds until it resets to full duration.
 				local n = math.min(3, d.count)
 				local c = (n == 1 and colors.drHalf) or (n == 2 and colors.drQuarter) or colors.drImmune
 				icon:Set(d.icon, nil, ns.DR_RESET, d.full)
-				icon.timer:SetText("")
 				icon:SetBorder(c[1], c[2], c[3])
 				icon.count:SetText(n)
 				icon.count:SetTextColor(c[1], c[2], c[3])
@@ -478,12 +476,8 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 		if enemy then
 			-- diminishing returns reset: drop the icon right away (no DR event fires at that moment)
 			icon.onExpire = function() f:UpdateSide() end
-			-- no countdown: just the big DR count in the middle
-			icon.timer:SetAlpha(0)
-			ns:Font(icon.count, 18, true)
-			icon.count:ClearAllPoints()
-			icon.count:SetPoint("CENTER", 0, 0)
-			icon.count:SetJustifyH("CENTER")
+			-- DR count in the bottom-right corner, reset timer in the middle
+			ns:Font(icon.count, 13, true)
 		end
 		icon:ClearAllPoints()
 		if not enemy then
