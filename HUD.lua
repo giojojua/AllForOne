@@ -655,6 +655,49 @@ local function StyleEditBox(eb)
 	if header then header:SetFont(font, 14, "") end
 end
 
+----------------------------------------------------------------------
+-- Quest tracker (WatchFrame): right above the chat, filling the space up to under your
+-- own frame. Hidden in arenas and battlegrounds. Moves only out of combat (it holds
+-- quest item buttons, which the game protects in combat).
+----------------------------------------------------------------------
+local SetupQuests
+local QUEST_TOP = 470 -- design pixels from the top of the screen: under your own frame
+local placingQuests = false
+local function PlaceQuests()
+	if not WatchFrame or not ChatFrame1 or placingQuests then return end
+	local _, kind = IsInInstance()
+	placingQuests = true
+	if kind == "arena" or kind == "pvp" then
+		if WatchFrame:IsShown() then WatchFrame:Hide(); WatchFrame.afoHidden = true end
+	else
+		-- only bring back what we hid ourselves (the game hides it when nothing is tracked)
+		if WatchFrame.afoHidden then WatchFrame.afoHidden = nil; WatchFrame:Show() end
+		WatchFrame:ClearAllPoints()
+		WatchFrame:SetPoint("BOTTOMLEFT", ChatFrame1, "TOPLEFT", -4, 34) -- above the chat tabs
+		-- height: from the chat up to QUEST_TOP (compare in screen pixels, the frames scale differently)
+		local es, rs, cs = WatchFrame:GetEffectiveScale(), ns.root:GetEffectiveScale(), ChatFrame1:GetEffectiveScale()
+		local top = ns.root:GetTop() and (ns.root:GetTop() * rs - QUEST_TOP * rs)
+		local chatTop = ChatFrame1:GetTop() and (ChatFrame1:GetTop() * cs + 34 * es)
+		if top and chatTop then
+			WatchFrame:SetHeight(math.max(150, (top - chatTop) / es))
+		end
+	end
+	placingQuests = false
+end
+local function QueuePlaceQuests()
+	if not placingQuests then ns:SafeCall(PlaceQuests) end
+end
+
+SetupQuests = function()
+	if not WatchFrame then return end
+	PlaceQuests()
+	-- Blizzard re-anchors and resizes it (UIParent_ManageFramePositions): put it back each time
+	hooksecurefunc(WatchFrame, "SetPoint", QueuePlaceQuests)
+	if UIParent_ManageFramePositions then hooksecurefunc("UIParent_ManageFramePositions", QueuePlaceQuests) end
+	ns:On("PLAYER_ENTERING_WORLD", QueuePlaceQuests)
+	ns:On("ZONE_CHANGED_NEW_AREA", QueuePlaceQuests)
+end
+
 local function SetupChat()
 	for _, name in ipairs({ "ChatFrameMenuButton", "FriendsMicroButton", "ChatFrame1ButtonFrame" }) do
 		if _G[name] then ns:Kill(_G[name]) end
@@ -883,7 +926,7 @@ ns:Listen("LOGIN", function()
 		SetupMenu()
 		SetupXP()
 	end
-	if ns.db.chat then SetupChat() end
+	if ns.db.chat then SetupChat(); SetupQuests() end
 	SetupArena()
 	ArenaZone()
 end)
