@@ -656,91 +656,41 @@ local function StyleEditBox(eb)
 end
 
 ----------------------------------------------------------------------
--- Quest tracker (WatchFrame): a box right above the chat, as wide as the chat, text at 80%,
--- scrolls with the mouse wheel. Hidden in arenas and battlegrounds.
--- The tracker stays a normal frame (no scroll frame: it holds quest item buttons the game
--- protects). Scrolling slides it up behind the box and fades out the lines outside the box.
--- It only moves out of combat.
+-- Quest tracker (WatchFrame): right above the chat, as wide as the chat, at most 180px
+-- tall, text at 80%. Hidden in arenas and battlegrounds. Moves only out of combat (it holds
+-- quest item buttons, which the game protects). No scrolling: when more is tracked than
+-- fits, Blizzard cuts the list off at the bottom (that's the version that showed up fine).
 ----------------------------------------------------------------------
 local SetupQuests
-local QUEST_TOP = 470       -- never higher than this (design pixels from the top): under your own frame
-local QUEST_MAX_H = 180     -- the visible box is at most this tall; the rest scrolls
+local QUEST_TOP = 470   -- never higher than this (design pixels from the top): under your own frame
+local QUEST_MAX_H = 180
 local QUEST_SCALE = 0.8
-local QUEST_LAYOUT_H = 1400 -- tall enough that Blizzard lays out every tracked line
-local questBox, questBar
-local questScroll = 0
+local questBox, questScroll = nil, 0 -- kept for /afo quests
 local placingQuests = false
 
--- every piece of the tracker that can be shown (lines, item buttons, header)
-local function QuestParts()
-	local parts = {}
-	local function Add(f) if f and f ~= WatchFrameLines then parts[#parts + 1] = f end end
-	if WatchFrameLines then
-		for _, c in ipairs({ WatchFrameLines:GetChildren() }) do Add(c) end
-		for _, r in ipairs({ WatchFrameLines:GetRegions() }) do Add(r) end
-	end
-	for _, c in ipairs({ WatchFrame:GetChildren() }) do Add(c) end
-	for _, r in ipairs({ WatchFrame:GetRegions() }) do Add(r) end
-	return parts
-end
-
--- fade out what's outside the box, and work out how far the list can scroll
-local function ClipQuests()
-	if not questBox or not questBox:IsShown() then return end
-	local boxTop, boxBottom = questBox:GetTop(), questBox:GetBottom()
-	if not boxTop then return end
-	local bs = questBox:GetEffectiveScale()
-	boxTop, boxBottom = boxTop * bs, boxBottom * bs
-	local lowest
-	for _, f in ipairs(QuestParts()) do
-		local t, b = f:GetTop(), f:GetBottom()
-		if t and b and f:IsShown() then
-			local s = f:GetEffectiveScale()
-			t, b = t * s, b * s
-			if not lowest or b < lowest then lowest = b end
-			f:SetAlpha((b >= boxBottom - 2 and t <= boxTop + 2) and 1 or 0)
-		end
-	end
-	-- scroll range: how far the lowest line hangs below the box
-	local wTop = WatchFrame:GetTop()
-	if wTop and lowest then
-		local contentH = (wTop * WatchFrame:GetEffectiveScale() - lowest) / bs
-		local max = math.max(0, contentH - questBox:GetHeight() + 6)
-		questBar:SetMinMaxValues(0, max)
-		if max <= 0 then questBar:Hide() else questBar:Show() end
-	end
-end
-
 local function PlaceQuests()
-	if not WatchFrame or not ChatFrame1 or not questBox or placingQuests then return end
+	if not WatchFrame or not ChatFrame1 or placingQuests then return end
 	local _, kind = IsInInstance()
 	placingQuests = true
 	if kind == "arena" or kind == "pvp" then
-		questBox:Hide()
 		if WatchFrame:IsShown() then WatchFrame:Hide(); WatchFrame.afoHidden = true end
 	else
-		questBox:Show()
 		if WatchFrame.afoHidden then WatchFrame.afoHidden = nil; WatchFrame:Show() end
-		-- the box: above the chat tabs, as wide as the chat, up to QUEST_MAX_H tall
-		questBox:ClearAllPoints()
-		questBox:SetPoint("BOTTOMLEFT", ChatFrame1, "TOPLEFT", -4, 34)
-		local bs, rs, cs = questBox:GetEffectiveScale(), ns.root:GetEffectiveScale(), ChatFrame1:GetEffectiveScale()
-		local h = QUEST_MAX_H * rs / bs
-		local top = ns.root:GetTop() and (ns.root:GetTop() * rs - QUEST_TOP * rs)
-		local chatTop = ChatFrame1:GetTop() and (ChatFrame1:GetTop() * cs + 34 * bs)
-		if top and chatTop then h = math.min(h, (top - chatTop) / bs) end
-		questBox:SetHeight(math.max(80, h))
-		local cw = (ChatFrame1:GetWidth() or 400) * cs / bs
-		questBox:SetWidth(cw - 10) -- room for the scroll bar
-		-- the tracker: top at the box's top, slid up by the scroll amount
+		if WatchFrame:GetParent() ~= UIParent then WatchFrame:SetParent(UIParent) end
+		WatchFrame:SetAlpha(1)
 		WatchFrame:SetScale(QUEST_SCALE)
 		WatchFrame:ClearAllPoints()
-		WatchFrame:SetPoint("TOPLEFT", questBox, "TOPLEFT", 0, questScroll / QUEST_SCALE)
-		WatchFrame:SetWidth((cw - 10) / QUEST_SCALE)
-		WatchFrame:SetHeight(QUEST_LAYOUT_H)
+		WatchFrame:SetPoint("BOTTOMLEFT", ChatFrame1, "TOPLEFT", -4, 34 / QUEST_SCALE) -- above the chat tabs
+		local es, rs, cs = WatchFrame:GetEffectiveScale(), ns.root:GetEffectiveScale(), ChatFrame1:GetEffectiveScale()
+		local h = QUEST_MAX_H * rs / es
+		local top = ns.root:GetTop() and (ns.root:GetTop() * rs - QUEST_TOP * rs)
+		local chatTop = ChatFrame1:GetTop() and (ChatFrame1:GetTop() * cs + 34 * cs)
+		if top and chatTop then h = math.min(h, (top - chatTop) / es) end
+		WatchFrame:SetHeight(math.max(100, h))
+		local cw = ChatFrame1:GetWidth()
+		if cw and cw > 0 then WatchFrame:SetWidth(cw * cs / es) end
 	end
 	placingQuests = false
-	ClipQuests()
 end
 local function QueuePlaceQuests()
 	if not placingQuests then ns:SafeCall(PlaceQuests) end
@@ -748,50 +698,13 @@ end
 
 SetupQuests = function()
 	if not WatchFrame then return end
-	questBox = CreateFrame("Frame", "AllForOneQuestBox", UIParent)
-	questBox:EnableMouseWheel(true)
-	-- thin scroll bar on the right, like the chat's
-	questBar = CreateFrame("Slider", nil, questBox)
-	questBar:SetOrientation("VERTICAL")
-	questBar:SetWidth(6)
-	questBar:SetPoint("TOPLEFT", questBox, "TOPRIGHT", 4, 0)
-	questBar:SetPoint("BOTTOMLEFT", questBox, "BOTTOMRIGHT", 4, 0)
-	local track = questBar:CreateTexture(nil, "BACKGROUND")
-	track:SetAllPoints()
-	track:SetTexture(0, 0, 0, 0.35)
-	local thumb = questBar:CreateTexture(nil, "OVERLAY")
-	thumb:SetTexture(colors.muted[1], colors.muted[2], colors.muted[3], 1)
-	thumb:SetSize(6, 30)
-	questBar:SetThumbTexture(thumb)
-	questBar:SetMinMaxValues(0, 0)
-	questBar:SetValueStep(1)
-	questBar:SetValue(0)
-	questBar:SetScript("OnValueChanged", function(_, v)
-		if InCombatLockdown() then return end -- the tracker can't move in combat
-		questScroll = v
-		QueuePlaceQuests()
-	end)
-	questBar:Hide()
-	local function Wheel(_, delta)
-		if InCombatLockdown() then return end
-		local _, max = questBar:GetMinMaxValues()
-		questBar:SetValue(math.max(0, math.min(max, questBar:GetValue() - delta * 30)))
-	end
-	questBox:SetScript("OnMouseWheel", Wheel)
-	questBar:EnableMouseWheel(true)
-	questBar:SetScript("OnMouseWheel", Wheel)
-
 	PlaceQuests()
-	-- Blizzard re-anchors and resizes it (UIParent_ManageFramePositions): put it back each time
 	hooksecurefunc(WatchFrame, "SetPoint", QueuePlaceQuests)
 	if UIParent_ManageFramePositions then hooksecurefunc("UIParent_ManageFramePositions", QueuePlaceQuests) end
 	ns:On("PLAYER_ENTERING_WORLD", QueuePlaceQuests)
 	ns:On("ZONE_CHANGED_NEW_AREA", QueuePlaceQuests)
 	ChatFrame1:HookScript("OnSizeChanged", QueuePlaceQuests)
 	if WatchFrame_SetWidth then hooksecurefunc("WatchFrame_SetWidth", QueuePlaceQuests) end
-	-- quests added / removed / progress: lines move, so clip again
-	if WatchFrame_Update then hooksecurefunc("WatchFrame_Update", ClipQuests) end
-	ns:On("QUEST_LOG_UPDATE", ClipQuests)
 end
 
 -- /afo quests: what the tracker is doing (for bug reports)
