@@ -141,7 +141,9 @@ function ns:GetDR(guid)
 	local now = GetTime()
 	for cat, s in pairs(states) do
 		if s.active or s.reset > now then
-			out[#out + 1] = { cat = cat, count = s.count, reset = s.reset, icon = s.icon, active = s.active }
+			-- while the crowd control is still on, the reset is an estimate: its end + 18s
+			local full = s.active and s.ccEnds and (s.ccEnds + ns.DR_RESET) or (not s.active and s.reset) or nil
+			out[#out + 1] = { cat = cat, count = s.count, reset = s.reset, icon = s.icon, active = s.active, full = full }
 		else
 			states[cat] = nil
 		end
@@ -284,6 +286,7 @@ local function AuraApplied(dstGUID, spellId, spellName, mine, refresh)
 		s.count = s.count + 1
 		s.active = true
 		s.reset = math.huge
+		s.ccEnds = expires -- when this crowd control should end (the 18s reset starts then)
 		s.icon = ns.myDRIcon[cc.cat] or icon -- your spell if you have one in this category
 		ns:Send("DR", dstGUID)
 	end

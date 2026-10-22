@@ -292,7 +292,8 @@ function Row:UpdateSide()
 				if d.count <= 1 then c, mark = colors.drHalf, "½"
 				elseif d.count == 2 then c, mark = colors.drQuarter, "¼"
 				else c, mark = colors.drImmune, "×" end
-				icon:Set(d.icon, nil, ns.DR_RESET, (not d.active) and d.reset or nil)
+				-- countdown in the middle: seconds until full-duration crowd control again
+				icon:Set(d.icon, nil, ns.DR_RESET, d.full)
 				icon:SetBorder(c[1], c[2], c[3])
 				icon.count:SetText(mark)
 				icon.count:SetTextColor(c[1], c[2], c[3])
@@ -447,7 +448,9 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 
 	f.side = {}
 	for i = 1, 4 do
-		local icon = ns:CreateIcon(f, 30, 12)
+		local icon = ns:CreateIcon(f, 30, 14)
+		-- diminishing returns reset: drop the icon right away (no DR event fires at that moment)
+		if enemy then icon.onExpire = function() f:UpdateSide() end end
 		icon:ClearAllPoints()
 		if not enemy then
 			icon:SetPoint("TOPLEFT", f, "TOPLEFT", ROW_W + 8 + (i - 1) * 34, -5)
