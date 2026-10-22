@@ -662,7 +662,7 @@ end
 ----------------------------------------------------------------------
 local SetupQuests
 local QUEST_TOP = 470   -- never higher than this (design pixels from the top): under your own frame
-local QUEST_MAX_H = 240 -- and never taller than this
+local QUEST_MAX_H = 180 -- and never taller than this
 local QUEST_SCALE = 0.85
 local placingQuests = false
 local function PlaceQuests()
@@ -684,6 +684,9 @@ local function PlaceQuests()
 		local h = QUEST_MAX_H * rs / es
 		if top and chatTop then h = math.min(h, (top - chatTop) / es) end
 		WatchFrame:SetHeight(math.max(120, h))
+		-- as wide as the chat
+		local cw = ChatFrame1:GetWidth()
+		if cw and cw > 0 then WatchFrame:SetWidth(cw * cs / es) end
 	end
 	placingQuests = false
 end
@@ -699,6 +702,9 @@ SetupQuests = function()
 	if UIParent_ManageFramePositions then hooksecurefunc("UIParent_ManageFramePositions", QueuePlaceQuests) end
 	ns:On("PLAYER_ENTERING_WORLD", QueuePlaceQuests)
 	ns:On("ZONE_CHANGED_NEW_AREA", QueuePlaceQuests)
+	-- follow the chat's size, and Blizzard's own width changes (Interface > Objectives > wide)
+	ChatFrame1:HookScript("OnSizeChanged", QueuePlaceQuests)
+	if WatchFrame_SetWidth then hooksecurefunc("WatchFrame_SetWidth", QueuePlaceQuests) end
 end
 
 local function SetupChat()
