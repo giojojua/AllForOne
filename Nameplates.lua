@@ -94,6 +94,20 @@ local function Classify(r, g, b)
 	return "hostile"
 end
 
+-- pets on your side (yours, your party's and raid's): blue plates, so they never look like enemies
+local friendlyPets = {}
+local function ScanPets()
+	wipe(friendlyPets)
+	local function Add(u) if UnitExists(u) then local n = UnitName(u); if n then friendlyPets[n] = true end end end
+	Add("pet")
+	for i = 1, 4 do Add("partypet" .. i) end
+	for i = 1, (GetNumRaidMembers and GetNumRaidMembers() or 0) do Add("raidpet" .. i) end
+end
+ns:On("UNIT_PET", ScanPets)
+ns:On("PARTY_MEMBERS_CHANGED", ScanPets)
+ns:On("RAID_ROSTER_UPDATE", ScanPets)
+ns:On("PLAYER_ENTERING_WORLD", ScanPets)
+
 local function ArenaNumber(name)
 	if not name then return nil end
 	for i = 1, 5 do
@@ -300,7 +314,14 @@ local function UpdatePlate(plate, d)
 	local r, g, b = d.health:GetStatusBarColor()
 	local kind, class = Classify(r, g, b)
 	local name = d.nameText:GetText()
-	local friendly = (kind == "friendlyPlayer" or kind == "friendlyNPC")
+	-- a pet on your side: friendly, whatever color the game gave its bar
+	-- (unless an enemy arena pet has the same name, e.g. two Water Elementals: then trust the bar color)
+	if name and friendlyPets[name] then
+		local clash = false
+		for i = 1, 5 do if UnitExists("arenapet" .. i) and UnitName("arenapet" .. i) == name then clash = true end end
+		if not clash then kind, class = "friendlyPet", nil end
+	end
+	local friendly = (kind == "friendlyPlayer" or kind == "friendlyNPC" or kind == "friendlyPet")
 
 	local totem = TotemIcon(name)
 	if totem then return UpdateTotem(d, totem, friendly, r, g, b) end
@@ -344,7 +365,9 @@ local function UpdatePlate(plate, d)
 	local w, h = 128, 12
 	if isTarget then w, h = 150, 14 end
 	d.hp:SetSize(w, h)
-	if friendly then
+	if kind == "friendlyPet" then
+		d.hp:SetStatusBarColor(colors.channel[1], colors.channel[2], colors.channel[3]) -- friendly pets: blue
+	elseif friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
 	elseif kind == "enemyPlayer" then
 		d.hp:SetStatusBarColor(ns:ClassColor(class))
