@@ -102,7 +102,7 @@ Procs appear as glowing icons next to your character. Nothing is tracked until y
 - **Suggested for your class:** common procs for your class, + to add.
 - **Your buffs right now:** whatever is on you this moment, + to add (handy when a proc pops and you don't know its exact name).
 
-Your list is saved for your account. Commands also work: `/afo procs add <name or ID>`, `/afo procs remove <name or ID>`, `/afo procs reset` (clears the list).
+Each character has its own list (a new character starts from your old shared list, without other classes' procs). Commands also work: `/afo procs add <name or ID>`, `/afo procs remove <name or ID>`, `/afo procs reset` (clears this character's list).
 
 ### Commands
 | Command | What it does |

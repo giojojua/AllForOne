@@ -1,21 +1,45 @@
 -- AllForOne: which procs to show, and the /afo procs window
 -- Nothing is tracked by default. Add procs in the window (or with /afo procs add ...).
--- Saved for your account in AllForOneDB.procs.list: lower-case name -> { name, icon }
+-- Saved per character in AllForOneDB.procs.chars["Name-Realm"]: lower-case name -> { name, icon }
 local _, ns = ...
 local colors = ns.colors
 
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
 
+-- procs that belong to another class (so a shared old list doesn't give a warrior Hot Streak)
+local function OtherClassProc(key, myClass)
+	for class, list in pairs(ns.ProcSuggest or {}) do
+		if class ~= myClass then
+			for _, s in ipairs(list) do if strlower(s.name) == key then return true end end
+		end
+	end
+	return false
+end
+
 local function List()
 	ns.db.procs = ns.db.procs or {}
 	local db = ns.db.procs
-	if not db.list then
-		db.list = {}
-		-- keep anything added with the earlier command-only version
-		for key, name in pairs(db.added or {}) do db.list[key] = { name = name } end
+	-- the earlier command-only version
+	if db.added then
+		db.list = db.list or {}
+		for key, name in pairs(db.added) do db.list[key] = { name = name } end
 		db.added, db.removed = nil, nil
 	end
-	return db.list
+	db.chars = db.chars or {}
+	local me = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+	local mine = db.chars[me]
+	if not mine then
+		-- spell names aren't known before login: don't build (and save) the list yet
+		if not (ns.ProcSuggest and next(ns.ProcSuggest)) then return {} end
+		-- first time on this character: start from the old shared list, minus other classes' procs
+		mine = {}
+		local _, class = UnitClass("player")
+		for key, e in pairs(db.list or {}) do
+			if not OtherClassProc(key, class) then mine[key] = { name = e.name, icon = e.icon } end
+		end
+		db.chars[me] = mine
+	end
+	return mine
 end
 
 function ns:IsProc(name)
@@ -201,7 +225,7 @@ local function CreatePanel()
 	local sub = ns:CreateText(panel, 12, false, "LEFT")
 	sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
 	sub:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	sub:SetText("Shown as glowing icons next to your character")
+	sub:SetText("This character's procs · glowing icons next to your character")
 	local close = Button(panel, "×", 24, 24, function() panel:Hide() end)
 	close:SetPoint("TOPRIGHT", -PAD + 4, -PAD + 4)
 
@@ -264,7 +288,7 @@ function ns:ProcCommand(arg)
 		wipe(List())
 		if ns.ScanPlayer then ns.ScanPlayer() end
 		if Refresh then Refresh() end
-		ns:Print("proc list cleared")
+		ns:Print("proc list of this character cleared")
 	else
 		ns:ToggleProcWindow()
 	end
