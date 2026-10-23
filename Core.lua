@@ -159,8 +159,20 @@ ns.colors = {
 	},
 }
 
+-- Class colors: the modern WoW palette (what most addons and sites use today), exact hex.
+-- The game's own 3.3.5 table is only used to recognise Blizzard's colored nameplate bars.
+local function Hex(h) return tonumber(h:sub(1, 2), 16) / 255, tonumber(h:sub(3, 4), 16) / 255, tonumber(h:sub(5, 6), 16) / 255 end
+ns.CLASS_COLORS = {}
+for class, h in pairs({
+	DEATHKNIGHT = "C41E3A", DRUID = "FF7C0A", HUNTER = "AAD372", MAGE = "3FC7EB", PALADIN = "F48CBA",
+	PRIEST = "FFFFFF", ROGUE = "FFF468", SHAMAN = "0070DD", WARLOCK = "8788EE", WARRIOR = "C69B6D",
+}) do
+	local r, g, b = Hex(h)
+	ns.CLASS_COLORS[class] = { r = r, g = g, b = b, hex = h }
+end
+
 function ns:ClassColor(class)
-	local c = class and RAID_CLASS_COLORS[class]
+	local c = class and (ns.CLASS_COLORS[class] or RAID_CLASS_COLORS[class])
 	if c then return c.r, c.g, c.b end
 	return 0.6, 0.6, 0.6
 end
