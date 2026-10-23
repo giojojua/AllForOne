@@ -234,18 +234,61 @@ ns.trinketCooldown = 120
 ----------------------------------------------------------------------
 -- Spec detection: a spell seen from a player tells us their spec
 ----------------------------------------------------------------------
+-- (talent-only casts, talent buffs / procs / forms, and talent pets; any event from the
+-- player or their pet counts: casts, damage, heals, auras, summons)
 local specList = {
-	WARRIOR = { Arms = { 47486, 46924 }, Fury = { 23881, 60970 }, Protection = { 47498, 46968, 50720 } },
-	PALADIN = { Holy = { 48825, 53563, 31842 }, Retribution = { 35395, 53385, 20066 }, Protection = { 53595, 48827 } },
-	HUNTER = { ["Beast Mastery"] = { 19574, 19577 }, Marksmanship = { 53209, 34490 }, Survival = { 60053, 49012 } },
-	ROGUE = { Assassination = { 48666, 14177 }, Combat = { 51690, 13750 }, Subtlety = { 36554, 51713, 14183 } },
-	PRIEST = { Discipline = { 53007, 33206, 10060 }, Holy = { 48089, 47788 }, Shadow = { 15473, 48160, 47585, 64044 } },
-	DRUID = { Restoration = { 18562, 53251, 17116 }, Feral = { 48566, 48564, 50334 }, Balance = { 53201, 24858, 61384 } },
-	SHAMAN = { Restoration = { 49284, 61301, 16190 }, Enhancement = { 17364, 51533, 60103, 30823 }, Elemental = { 59159, 16166, 57722 } },
-	MAGE = { Arcane = { 44781, 12042 }, Fire = { 55360, 42950, 11129 }, Frost = { 44572, 43039, 31687 } },
-	WARLOCK = { Affliction = { 59164, 47843 }, Demonology = { 47241, 30146 }, Destruction = { 59172, 47847, 17962 } },
-	DEATHKNIGHT = { Blood = { 55262, 49016, 49028 }, Frost = { 51411, 49203, 55268 }, Unholy = { 55271, 49206, 49222, 51052 } },
+	WARRIOR = {
+		Arms = { 47486, 12294, 46924, 12328, 46857, 52437, 60503 },          -- Mortal Strike, Bladestorm, Sweeping Strikes, Trauma, Sudden Death, Taste for Blood
+		Fury = { 23881, 60970, 46916, 12292 },                              -- Bloodthirst, Heroic Fury, Bloodsurge, Death Wish
+		Protection = { 47498, 46968, 50720, 12809, 50227 },                 -- Devastate, Shockwave, Vigilance, Concussion Blow, Sword and Board
+	},
+	PALADIN = {
+		Holy = { 48825, 20473, 53563, 31842, 20216, 31834, 54149, 31821 },  -- Holy Shock, Beacon, Divine Illumination, Divine Favor, Light's Grace, Infusion of Light, Aura Mastery
+		Retribution = { 35395, 53385, 20066, 59578, 20375 },                -- Crusader Strike, Divine Storm, Repentance, The Art of War, Seal of Command
+		Protection = { 53595, 48827, 31935, 20925, 64205 },                 -- Hammer of the Righteous, Avenger's Shield, Holy Shield, Divine Sacrifice
+	},
+	HUNTER = {
+		["Beast Mastery"] = { 19574, 19577, 34471 },                         -- Bestial Wrath, Intimidation, The Beast Within
+		Marksmanship = { 53209, 34490, 19506, 23989, 53220 },               -- Chimera Shot, Silencing Shot, Trueshot Aura, Readiness, Improved Steady Shot
+		Survival = { 60053, 53301, 49012, 19386, 3674, 19306, 56453 },      -- Explosive Shot, Wyvern Sting, Black Arrow, Counterattack, Lock and Load
+	},
+	ROGUE = {
+		Assassination = { 48666, 1329, 14177, 51662, 58426 },               -- Mutilate, Cold Blood, Hunger for Blood, Overkill
+		Combat = { 51690, 13750, 13877, 14251 },                            -- Killing Spree, Adrenaline Rush, Blade Flurry, Riposte
+		Subtlety = { 36554, 51713, 14183, 16511, 14185, 14278 },            -- Shadowstep, Shadow Dance, Premeditation, Hemorrhage, Preparation, Ghostly Strike
+	},
+	PRIEST = {
+		Discipline = { 53007, 47540, 33206, 10060, 47930, 59888, 14751, 47753 }, -- Penance, Pain Suppression, Power Infusion, Grace, Borrowed Time, Inner Focus, Divine Aegis
+		Holy = { 48089, 34861, 47788, 33151, 724, 63735, 34754 },           -- Circle of Healing, Guardian Spirit, Surge of Light, Lightwell, Serendipity, Holy Concentration
+		Shadow = { 15473, 48160, 34914, 47585, 64044, 15487, 15286, 15407 }, -- Shadowform, Vampiric Touch, Dispersion, Psychic Horror, Silence, Vampiric Embrace, Mind Flay
+	},
+	DRUID = {
+		Restoration = { 18562, 53251, 48438, 17116, 33891, 34123 },         -- Swiftmend, Wild Growth, Nature's Swiftness, Tree of Life (form + aura)
+		Feral = { 48566, 33876, 48564, 33878, 50334, 49376, 16979, 24932, 69369 }, -- Mangle, Berserk, Feral Charge, Leader of the Pack, Predator's Swiftness
+		Balance = { 53201, 48505, 24858, 24907, 61384, 50516, 5570, 33831 }, -- Starfall, Moonkin Form / Aura, Typhoon, Insect Swarm, Force of Nature
+	},
+	SHAMAN = {
+		Restoration = { 49284, 974, 61301, 61295, 16190, 53390, 51886 },    -- Earth Shield, Riptide, Mana Tide, Tidal Waves, Cleanse Spirit
+		Enhancement = { 17364, 51533, 60103, 30823, 53817 },                -- Stormstrike, Feral Spirit, Lava Lash, Shamanistic Rage, Maelstrom Weapon
+		Elemental = { 59159, 51490, 16166, 57722, 30706 },                  -- Thunderstorm, Elemental Mastery, Totem of Wrath
+	},
+	MAGE = {
+		Arcane = { 44781, 44425, 12042, 12043, 44401, 31589 },              -- Arcane Barrage, Arcane Power, Presence of Mind, Missile Barrage, Slow
+		Fire = { 55360, 44457, 42950, 31661, 11129, 48108, 11113, 64343, 54741 }, -- Living Bomb, Dragon's Breath, Combustion, Hot Streak, Blast Wave, Impact, Firestarter
+		Frost = { 44572, 43039, 11426, 31687, 44544, 57761, 11958, 12472 }, -- Deep Freeze, Ice Barrier, Water Elemental, Fingers of Frost, Brain Freeze, Cold Snap, Icy Veins
+	},
+	WARLOCK = {
+		Affliction = { 59164, 48181, 47843, 30108, 31117, 18223 },          -- Haunt, Unstable Affliction (+ silence), Curse of Exhaustion
+		Demonology = { 47241, 30146, 47193, 71165, 63167, 19028 },          -- Metamorphosis, Felguard, Demonic Empowerment, Molten Core, Decimation, Soul Link
+		Destruction = { 59172, 50796, 47847, 30283, 17962, 54277, 34936, 17877 }, -- Chaos Bolt, Shadowfury, Conflagrate, Backdraft, Backlash, Shadowburn
+	},
+	DEATHKNIGHT = {
+		Blood = { 55262, 55050, 49016, 49028, 55233, 49005 },               -- Heart Strike, Hysteria, Dancing Rune Weapon, Vampiric Blood, Mark of Blood
+		Frost = { 51411, 49184, 49203, 55268, 49143, 51124, 59052 },        -- Howling Blast, Hungering Cold, Frost Strike, Killing Machine, Freezing Fog
+		Unholy = { 55271, 55090, 49206, 49222, 51052, 63560, 49194, 49158 }, -- Scourge Strike, Gargoyle, Bone Shield, Anti-Magic Zone, Ghoul Frenzy, Unholy Blight, Corpse Explosion
+	},
 }
+
 
 ----------------------------------------------------------------------
 -- Procs shown next to your character
@@ -335,14 +378,21 @@ ns:Listen("LOGIN", function()
 		local name, icon = Info(e[1])
 		if name then ns.Racial[name] = { name = name, icon = icon, cd = e[2] } end
 	end
+	-- a name that points at two different specs tells us nothing: drop it
+	local clash = {}
 	for class, specs in pairs(specList) do
 		for spec, ids in pairs(specs) do
 			for _, id in ipairs(ids) do
 				local name = Info(id)
-				if name then ns.Spec[name] = { class = class, spec = spec } end
+				if name then
+					local had = ns.Spec[name]
+					if had and (had.class ~= class or had.spec ~= spec) then clash[name] = true end
+					ns.Spec[name] = { class = class, spec = spec }
+				end
 			end
 		end
 	end
+	for name in pairs(clash) do ns.Spec[name] = nil end
 	for class, ids in pairs(procSuggestions) do
 		local list = {}
 		for _, id in ipairs(ids) do
