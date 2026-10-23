@@ -85,49 +85,6 @@ end
 local PLATE_W, PLATE_H = 160, 16
 local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
 local CAST_H, CAST_H_TARGET = 6, 7 -- the cast strip always sits under the health bar
-local CLASS_CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
-
--- Round textures: the game can turn any square texture into a circle (portrait style)
-local function Round(tex, path)
-	if SetPortraitToTexture and pcall(SetPortraitToTexture, tex, path) then
-		tex:SetTexCoord(0, 1, 0, 1)
-	else
-		tex:SetTexture(path)
-		tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-	end
-end
-
--- Round icon at the right end of the plate (class / creature / totem)
-local Orb = {}
-function Orb:SetRing(r, g, b) self.ring:SetVertexColor(r or 0.55, g or 0.55, b or 0.58, 1) end
-function Orb:SetClass(coords)
-	self.path = nil
-	self.tex:SetTexture(CLASS_CIRCLES)
-	self.tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
-end
-function Orb:SetIcon(path)
-	if self.path == path then return end
-	self.path = path
-	Round(self.tex, path)
-end
-local function CreateOrb(parent)
-	local o = CreateFrame("Frame", nil, parent)
-	o.back = o:CreateTexture(nil, "BACKGROUND")
-	o.back:SetPoint("TOPLEFT", -1, 1)
-	o.back:SetPoint("BOTTOMRIGHT", 1, -1)
-	Round(o.back, "Interface\\Buttons\\WHITE8X8")
-	o.back:SetVertexColor(0, 0, 0, 1)
-	o.ring = o:CreateTexture(nil, "BORDER")
-	o.ring:SetAllPoints(o)
-	Round(o.ring, "Interface\\Buttons\\WHITE8X8")
-	o.tex = o:CreateTexture(nil, "ARTWORK")
-	o.tex:SetPoint("TOPLEFT", 2, -2)
-	o.tex:SetPoint("BOTTOMRIGHT", -2, 2)
-	for k, v in pairs(Orb) do o[k] = v end
-	o:SetRing()
-	o:Hide()
-	return o
-end
 
 local function Classify(r, g, b)
 	if r > 0.9 and g < 0.2 and b < 0.2 then return "hostile" end
@@ -213,7 +170,7 @@ local function Setup(plate)
 	Gloss(d.hp)
 	-- health: "31.2k · 74%" inside the bar (kept clear of the round icon)
 	d.hpText = ns:CreateText(d.hp, 12, true, "RIGHT")
-	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -9, 0)
+	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -4, 0)
 	-- kill target helper mark (red cross / blue square), left of the health text
 	d.mark = d.hp:CreateTexture(nil, "OVERLAY")
 	d.mark:SetSize(18, 18)
@@ -256,13 +213,13 @@ local function Setup(plate)
 	d.mine = {}
 	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 24, 12) end
 
-	-- round class / creature icon capping the right end of the bar (bigger on your target)
-	d.classIcon = CreateOrb(f)
-	d.classIcon:SetFrameLevel(d.hp:GetFrameLevel() + 4)
+	-- square class / creature icon on the left, as tall as the health bar + cast strip
+	d.classIcon = ns:CreateIcon(f, 24)
+	d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 
-	-- raid markers (skull, X...) go on the left so they never cover the class icon
+	-- raid markers (skull, X...) go on the right so they never cover the class icon
 	raidIcon:ClearAllPoints()
-	raidIcon:SetPoint("RIGHT", d.hp, "LEFT", -4, -3)
+	raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, -3)
 	raidIcon:SetSize(20, 20)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
@@ -366,9 +323,10 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.classIcon:SetSize(28, 28)
 	d.classIcon:ClearAllPoints()
 	d.classIcon:SetPoint("BOTTOM", d.hp, "TOP", 0, 3)
-	d.classIcon:SetIcon(icon)
+	d.classIcon.tex:SetTexture(icon)
+	d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	local c = friendly and colors.friendly or colors.danger
-	d.classIcon:SetRing(c[1], c[2], c[3])
+	d.classIcon:SetBorder(c[1], c[2], c[3])
 	d.classIcon:Show()
 	d.name:SetText("")
 	d.num:SetText("")
@@ -399,6 +357,7 @@ local function UpdatePlate(plate, d)
 		-- plate frames get reused: put the normal layout back
 		d.isTotem = nil
 		d.track:Show()
+		d.classIcon:SetBorder()
 	end
 	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
 	local arena = (not friendly) and ArenaNumber(name)
@@ -447,27 +406,29 @@ local function UpdatePlate(plate, d)
 	ns:SetHighlight(d.hp, isTarget)
 	ns:SetHighlight(d.track, isTarget)
 
-	-- round icon on the right end for everyone: class icon for players, creature-type icon for NPCs
-	-- (a bit taller than the bar + cast strip, overlapping the bar's end)
-	local size = h + castH + 9
+	-- square icon on the left for everyone: class icon for players, creature-type icon for NPCs;
+	-- exactly as tall as the health bar + cast strip block
+	local size = h + 1 + castH
 	d.classIcon:SetSize(size, size)
 	d.classIcon:ClearAllPoints()
-	d.classIcon:SetPoint("CENTER", d.hp, "RIGHT", size / 2 - 6, -(castH + 1) / 2)
-	if isTarget then d.classIcon:SetRing(1, 1, 1) else d.classIcon:SetRing() end
+	d.classIcon:SetPoint("TOPRIGHT", d.hp, "TOPLEFT", -3, 0)
+	ns:SetHighlight(d.classIcon, isTarget)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if not coords and unit and UnitIsPlayer(unit) then
 		local _, c = UnitClass(unit)
 		coords = c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
 	end
 	if coords then
-		d.classIcon:SetClass(coords)
+		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
+		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 	elseif friendly then
 		-- friendly NPCs (vendors, guards...) and players whose class we don't know yet: no icon
 		d.classIcon:Hide()
 	else
 		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
 		if unit and not UnitIsPlayer(unit) and name then npcIcons[name] = ns:CreatureIcon(unit) end
-		d.classIcon:SetIcon((name and npcIcons[name]) or ns.creatureFallback)
+		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
+		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	end
 	if coords or not friendly then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
