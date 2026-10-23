@@ -300,7 +300,9 @@ function A:ReportLines(m, full)
 	local tr2 = A:Trends()
 	if tr2.games > 0 then
 		H(format("TRENDS  (your last %d arenas)", tr2.games))
-		T(format("Win rate %d%%  ·  %d wins, %d losses", floor(tr2.wins / tr2.games * 100 + 0.5), tr2.wins, tr2.games - tr2.wins))
+		local draws = tr2.draws or 0
+		T(format("Win rate %d%%  ·  %d wins, %d losses%s", floor(tr2.wins / tr2.games * 100 + 0.5), tr2.wins, tr2.games - tr2.wins - draws,
+			draws > 0 and format(", %d draw%s", draws, draws == 1 and "" or "s") or ""))
 		T(format("Crowd-controlled %ds per game on average  ·  interrupts landed %d%%",
 			floor(tr2.ccOnMe / tr2.games + 0.5), tr2.kicksCast > 0 and floor(tr2.kicksLanded / tr2.kicksCast * 100 + 0.5) or 0))
 		local comps = {}
@@ -455,9 +457,10 @@ local function FillList(extra)
 			b.bottom:SetPoint("RIGHT", -6, 0)
 			b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 			b:SetScript("OnClick", function(self, button)
-				-- right-click: fix a wrong WIN / LOSS by hand
+				-- right-click: fix a wrong result by hand, WIN -> LOSS -> DRAW -> WIN
 				if button == "RightButton" and not self.match.test then
-					A:SetResult(self.match, self.match.result == "win" and "loss" or "win")
+					local nextResult = { win = "loss", loss = "draw", draw = "win" }
+					A:SetResult(self.match, nextResult[self.match.result or ""] or "win")
 					local keep = selected
 					FillList()
 					ShowReport(keep)
@@ -468,7 +471,7 @@ local function FillList(extra)
 			b:SetScript("OnEnter", function(self)
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 				GameTooltip:SetText(self.match.date or "")
-				GameTooltip:AddLine("Right-click to switch WIN / LOSS if it's wrong", 0.75, 0.76, 0.78)
+				GameTooltip:AddLine("Right-click to fix the result: WIN > LOSS > DRAW", 0.75, 0.76, 0.78)
 				GameTooltip:Show()
 			end)
 			b:SetScript("OnLeave", function() GameTooltip:Hide() end)
