@@ -84,6 +84,50 @@ end
 -- plate size: bigger, modern-looking bars (your target a bit bigger still)
 local PLATE_W, PLATE_H = 160, 16
 local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
+local CAST_H, CAST_H_TARGET = 6, 7 -- the cast strip always sits under the health bar
+local CLASS_CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
+
+-- Round textures: the game can turn any square texture into a circle (portrait style)
+local function Round(tex, path)
+	if SetPortraitToTexture and pcall(SetPortraitToTexture, tex, path) then
+		tex:SetTexCoord(0, 1, 0, 1)
+	else
+		tex:SetTexture(path)
+		tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+end
+
+-- Round icon at the right end of the plate (class / creature / totem)
+local Orb = {}
+function Orb:SetRing(r, g, b) self.ring:SetVertexColor(r or 0.55, g or 0.55, b or 0.58, 1) end
+function Orb:SetClass(coords)
+	self.path = nil
+	self.tex:SetTexture(CLASS_CIRCLES)
+	self.tex:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+end
+function Orb:SetIcon(path)
+	if self.path == path then return end
+	self.path = path
+	Round(self.tex, path)
+end
+local function CreateOrb(parent)
+	local o = CreateFrame("Frame", nil, parent)
+	o.back = o:CreateTexture(nil, "BACKGROUND")
+	o.back:SetPoint("TOPLEFT", -1, 1)
+	o.back:SetPoint("BOTTOMRIGHT", 1, -1)
+	Round(o.back, "Interface\\Buttons\\WHITE8X8")
+	o.back:SetVertexColor(0, 0, 0, 1)
+	o.ring = o:CreateTexture(nil, "BORDER")
+	o.ring:SetAllPoints(o)
+	Round(o.ring, "Interface\\Buttons\\WHITE8X8")
+	o.tex = o:CreateTexture(nil, "ARTWORK")
+	o.tex:SetPoint("TOPLEFT", 2, -2)
+	o.tex:SetPoint("BOTTOMRIGHT", -2, 2)
+	for k, v in pairs(Orb) do o[k] = v end
+	o:SetRing()
+	o:Hide()
+	return o
+end
 
 local function Classify(r, g, b)
 	if r > 0.9 and g < 0.2 and b < 0.2 then return "hostile" end
@@ -153,20 +197,23 @@ local function Setup(plate)
 
 	d.hp = ns:CreateBar(f, PLATE_W, PLATE_H)
 	d.hp:SetPoint("CENTER", f, "CENTER", 0, 0)
-	-- modern look: soft shade on the lower half and a thin light line on top of the fill
-	local shade = d.hp:CreateTexture(nil, "OVERLAY")
-	shade:SetTexture(1, 1, 1, 1)
-	shade:SetPoint("BOTTOMLEFT", d.hp, "BOTTOMLEFT", 0, 0)
-	shade:SetPoint("TOPRIGHT", d.hp, "RIGHT", 0, 0)
-	shade:SetGradientAlpha("VERTICAL", 0, 0, 0, 0.35, 0, 0, 0, 0)
-	local shine = d.hp:CreateTexture(nil, "OVERLAY")
-	shine:SetTexture(1, 1, 1, 0.18)
-	shine:SetPoint("TOPLEFT", d.hp, "TOPLEFT", 0, 0)
-	shine:SetPoint("TOPRIGHT", d.hp, "TOPRIGHT", 0, 0)
-	shine:SetHeight(1)
-	-- health: "31.2k · 74%" inside the bar
+	-- glossy look: light top half, darker bottom half
+	local function Gloss(bar)
+		local gloss = bar:CreateTexture(nil, "OVERLAY")
+		gloss:SetTexture(1, 1, 1, 1)
+		gloss:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+		gloss:SetPoint("BOTTOMRIGHT", bar, "RIGHT", 0, 0)
+		gloss:SetGradientAlpha("VERTICAL", 1, 1, 1, 0.06, 1, 1, 1, 0.28)
+		local shade = bar:CreateTexture(nil, "OVERLAY")
+		shade:SetTexture(1, 1, 1, 1)
+		shade:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+		shade:SetPoint("TOPRIGHT", bar, "RIGHT", 0, 0)
+		shade:SetGradientAlpha("VERTICAL", 0, 0, 0, 0.3, 0, 0, 0, 0.05)
+	end
+	Gloss(d.hp)
+	-- health: "31.2k · 74%" inside the bar (kept clear of the round icon)
 	d.hpText = ns:CreateText(d.hp, 12, true, "RIGHT")
-	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -4, 0)
+	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -9, 0)
 	-- kill target helper mark (red cross / blue square), left of the health text
 	d.mark = d.hp:CreateTexture(nil, "OVERLAY")
 	d.mark:SetSize(18, 18)
@@ -179,9 +226,18 @@ local function Setup(plate)
 	d.num:SetPoint("BOTTOMRIGHT", d.hp, "TOPRIGHT", 0, 4)
 	d.name:SetPoint("RIGHT", d.num, "LEFT", -4, 0)
 
-	d.castbar = ns:CreateBar(f, PLATE_W, 8)
-	d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -3)
-	d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -3)
+	-- cast strip: always there, joined to the bottom of the health bar (one framed block);
+	-- the fill only shows while the unit casts
+	d.track = CreateFrame("Frame", nil, f)
+	ns:Skin(d.track)
+	d.track:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -1)
+	d.track:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -1)
+	d.track:SetHeight(CAST_H)
+	d.castbar = CreateFrame("StatusBar", nil, d.track)
+	d.castbar:SetAllPoints(d.track)
+	d.castbar:SetStatusBarTexture(ns.media.flat)
+	d.castbar:SetMinMaxValues(0, 1)
+	Gloss(d.castbar)
 	d.castbar:Hide()
 
 	d.pips = {}
@@ -200,14 +256,13 @@ local function Setup(plate)
 	d.mine = {}
 	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 24, 12) end
 
-	-- class icon: always on the left of the health bar (bigger on your target)
-	d.classIcon = ns:CreateIcon(f, 24)
-	d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-	d.classIcon:SetPoint("RIGHT", d.hp, "LEFT", -5, 0)
+	-- round class / creature icon capping the right end of the bar (bigger on your target)
+	d.classIcon = CreateOrb(f)
+	d.classIcon:SetFrameLevel(d.hp:GetFrameLevel() + 4)
 
-	-- raid markers (skull, X...) go on the right so they never cover the class icon
+	-- raid markers (skull, X...) go on the left so they never cover the class icon
 	raidIcon:ClearAllPoints()
-	raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, 0)
+	raidIcon:SetPoint("RIGHT", d.hp, "LEFT", -4, -3)
 	raidIcon:SetSize(20, 20)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
@@ -297,6 +352,7 @@ end
 local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.isTotem = true
 	d.hp:SetSize(PLATE_W / 2, 8) -- totems: half-size plate
+	d.track:Hide()
 	if friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
 	else
@@ -310,10 +366,9 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.classIcon:SetSize(28, 28)
 	d.classIcon:ClearAllPoints()
 	d.classIcon:SetPoint("BOTTOM", d.hp, "TOP", 0, 3)
-	d.classIcon.tex:SetTexture(icon)
-	d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	d.classIcon:SetIcon(icon)
 	local c = friendly and colors.friendly or colors.danger
-	d.classIcon:SetBorder(c[1], c[2], c[3])
+	d.classIcon:SetRing(c[1], c[2], c[3])
 	d.classIcon:Show()
 	d.name:SetText("")
 	d.num:SetText("")
@@ -343,9 +398,7 @@ local function UpdatePlate(plate, d)
 	if d.isTotem then
 		-- plate frames get reused: put the normal layout back
 		d.isTotem = nil
-		d.classIcon:ClearAllPoints()
-		d.classIcon:SetPoint("RIGHT", d.hp, "LEFT", -5, 0)
-		d.classIcon:SetBorder()
+		d.track:Show()
 	end
 	local isTarget = UnitExists("target") and plate:GetAlpha() == 1 and name == UnitName("target")
 	local arena = (not friendly) and ArenaNumber(name)
@@ -380,6 +433,8 @@ local function UpdatePlate(plate, d)
 	local w, h = PLATE_W, PLATE_H
 	if isTarget then w, h = PLATE_W_TARGET, PLATE_H_TARGET end
 	d.hp:SetSize(w, h)
+	local castH = isTarget and CAST_H_TARGET or CAST_H
+	d.track:SetHeight(castH)
 	if kind == "friendlyPet" then
 		d.hp:SetStatusBarColor(colors.channel[1], colors.channel[2], colors.channel[3]) -- friendly pets: blue
 	elseif friendly then
@@ -390,26 +445,29 @@ local function UpdatePlate(plate, d)
 		d.hp:SetStatusBarColor(r, g, b)
 	end
 	ns:SetHighlight(d.hp, isTarget)
+	ns:SetHighlight(d.track, isTarget)
 
-	-- icon on the left for everyone: class icon for players, creature-type icon for NPCs
-	local size = isTarget and 30 or 24
+	-- round icon on the right end for everyone: class icon for players, creature-type icon for NPCs
+	-- (a bit taller than the bar + cast strip, overlapping the bar's end)
+	local size = h + castH + 9
 	d.classIcon:SetSize(size, size)
+	d.classIcon:ClearAllPoints()
+	d.classIcon:SetPoint("CENTER", d.hp, "RIGHT", size / 2 - 6, -(castH + 1) / 2)
+	if isTarget then d.classIcon:SetRing(1, 1, 1) else d.classIcon:SetRing() end
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if not coords and unit and UnitIsPlayer(unit) then
 		local _, c = UnitClass(unit)
 		coords = c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
 	end
 	if coords then
-		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
-		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+		d.classIcon:SetClass(coords)
 	elseif friendly then
 		-- friendly NPCs (vendors, guards...) and players whose class we don't know yet: no icon
 		d.classIcon:Hide()
 	else
 		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
 		if unit and not UnitIsPlayer(unit) and name then npcIcons[name] = ns:CreatureIcon(unit) end
-		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
-		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		d.classIcon:SetIcon((name and npcIcons[name]) or ns.creatureFallback)
 	end
 	if coords or not friendly then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
@@ -463,19 +521,11 @@ local function UpdatePlate(plate, d)
 	local points = isTarget and GetComboPoints("player", "target") or 0
 	local gap = 2
 	local pipW = (w - 4 * gap) / 5
-	d.castbar:ClearAllPoints()
-	if points > 0 then
-		d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -(2 + 5 + 3))
-		d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -(2 + 5 + 3))
-	else
-		d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -3)
-		d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -3)
-	end
 	for i, pip in ipairs(d.pips) do
 		if points > 0 then
 			pip:SetSize(pipW, 5)
 			pip:ClearAllPoints()
-			pip:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", (i - 1) * (pipW + gap), -2)
+			pip:SetPoint("TOPLEFT", d.track, "BOTTOMLEFT", (i - 1) * (pipW + gap), -3)
 			if i <= points then
 				pip.fill:SetTexture(colors.combo[1], colors.combo[2], colors.combo[3], 1)
 			else
