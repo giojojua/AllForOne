@@ -146,7 +146,7 @@ local function Setup(plate)
 	health:SetAlpha(0)
 	cast:SetAlpha(0)
 
-	local d = { health = health, cast = cast, shield = castShield, nameText = nameText, raidIcon = raidIcon }
+	local d = { health = health, cast = cast, shield = castShield, spellIcon = spellIcon, nameText = nameText, raidIcon = raidIcon }
 	local f = CreateFrame("Frame", nil, plate)
 	f:SetSize(200, 70)
 	f:SetPoint("CENTER", health, "CENTER", 0, 0)
@@ -184,6 +184,11 @@ local function Setup(plate)
 	d.castbar:SetMinMaxValues(0, 1)
 	ns:Gloss(d.castbar)
 	d.castbar:Hide()
+	d.castbar:SetScript("OnHide", function()
+		d.castIcon:Hide()
+		d.raidIcon:ClearAllPoints()
+		d.raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, -3)
+	end)
 	-- smooth fill between plate updates
 	d.castbar:SetScript("OnUpdate", function(bar)
 		if not d.castStart then return bar:Hide() end
@@ -216,6 +221,11 @@ local function Setup(plate)
 	-- raid markers (skull, X...) go on the right so they never cover the class icon
 	raidIcon:ClearAllPoints()
 	raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, -3)
+
+	-- what the enemy is casting: spell icon on the right, as tall as the bar + cast strip
+	-- (the raid marker moves out of its way while it shows)
+	d.castIcon = ns:CreateIcon(f, 24)
+	d.castIcon:SetPoint("TOPLEFT", d.hp, "TOPRIGHT", 3, 0)
 	raidIcon:SetSize(20, 20)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
@@ -304,7 +314,7 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, _, srcName, _, _, dst
 		local castTime = srcName and spellId and select(7, GetSpellInfo(spellId))
 		if castTime and castTime > 0 then
 			local now = GetTime()
-			local c = { start = now, finish = now + castTime / 1000 }
+			local c = { start = now, finish = now + castTime / 1000, icon = select(3, GetSpellInfo(spellId)) }
 			-- plates show names without the realm, the combat log may add "-Realm"
 			logCasts[srcName], logCasts[Short(srcName)] = c, c
 		end
@@ -485,15 +495,15 @@ local function UpdatePlate(plate, d)
 	-- from the unit when we have one (target / focus / arena / mouseover / party), else from the
 	-- combat log by name (any enemy that starts a cast)
 	if not d.isTotem then
-		local spell, start, finish, locked, channel
+		local spell, start, finish, locked, channel, tex
 		local u = unit or (isTarget and "target") or nil
 		if u then
-			local _, _, _, _, s1, e1, _, _, nk = UnitCastingInfo(u)
+			local _, _, _, t1, s1, e1, _, _, nk = UnitCastingInfo(u)
 			if s1 then
-				spell, start, finish, locked = true, s1 / 1000, e1 / 1000, nk
+				spell, start, finish, locked, tex = true, s1 / 1000, e1 / 1000, nk, t1
 			else
-				local _, _, _, _, s2, e2, _, nk2 = UnitChannelInfo(u)
-				if s2 then spell, start, finish, locked, channel = true, s2 / 1000, e2 / 1000, nk2, true end
+				local _, _, _, t2, s2, e2, _, nk2 = UnitChannelInfo(u)
+				if s2 then spell, start, finish, locked, channel, tex = true, s2 / 1000, e2 / 1000, nk2, true, t2 end
 			end
 		end
 		if not spell and d.cast:IsShown() then
@@ -503,15 +513,23 @@ local function UpdatePlate(plate, d)
 				-- Blizzard bar counts in seconds (min 0, max cast time)
 				spell, start, finish = true, GetTime() - (v - cmin), GetTime() + (cmax - v)
 				locked = d.shield:IsShown()
+				tex = d.spellIcon:GetTexture()
 			end
 		end
 		local lc = not spell and name and logCasts[name]
 		if lc and lc.finish > GetTime() then
-			spell, start, finish, locked = true, lc.start, lc.finish, false
+			spell, start, finish, locked, tex = true, lc.start, lc.finish, false, lc.icon
 		end
 		if spell and finish > start then
 			d.castStart, d.castEnd, d.castChannel = start, finish, channel
 			local c = locked and colors.locked or (channel and colors.channel) or colors.kick
+			local size = h + 1 + castH
+			d.castIcon:SetSize(size, size)
+			d.castIcon.tex:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
+			d.castIcon:SetBorder(c[1], c[2], c[3])
+			d.castIcon:Show()
+			d.raidIcon:ClearAllPoints()
+			d.raidIcon:SetPoint("LEFT", d.castIcon, "RIGHT", 4, 0)
 			d.castbar:SetStatusBarColor(c[1], c[2], c[3])
 			d.castbar:SetMinMaxValues(0, 1)
 			if not d.castbar:IsShown() then d.castbar:Show() end
