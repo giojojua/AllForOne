@@ -81,6 +81,10 @@ local function IsPlate(f)
 end
 
 -- What is this plate? Blizzard colors the health bar by reaction / class.
+-- plate size: bigger, modern-looking bars (your target a bit bigger still)
+local PLATE_W, PLATE_H = 160, 16
+local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
+
 local function Classify(r, g, b)
 	if r > 0.9 and g < 0.2 and b < 0.2 then return "hostile" end
 	if r > 0.9 and g > 0.9 and b < 0.2 then return "neutral" end
@@ -142,29 +146,40 @@ local function Setup(plate)
 
 	local d = { health = health, cast = cast, shield = castShield, nameText = nameText, raidIcon = raidIcon }
 	local f = CreateFrame("Frame", nil, plate)
-	f:SetSize(150, 60)
+	f:SetSize(200, 70)
 	f:SetPoint("CENTER", health, "CENTER", 0, 0)
 	f:SetScale(ns.root:GetEffectiveScale() / plate:GetEffectiveScale())
 	d.frame = f
 
-	d.hp = ns:CreateBar(f, 128, 12)
+	d.hp = ns:CreateBar(f, PLATE_W, PLATE_H)
 	d.hp:SetPoint("CENTER", f, "CENTER", 0, 0)
-	-- health on enemy plates: "31.2k · 74%" inside the bar
-	d.hpText = ns:CreateText(d.hp, 10, true, "RIGHT")
-	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -3, 0)
+	-- modern look: soft shade on the lower half and a thin light line on top of the fill
+	local shade = d.hp:CreateTexture(nil, "OVERLAY")
+	shade:SetTexture(1, 1, 1, 1)
+	shade:SetPoint("BOTTOMLEFT", d.hp, "BOTTOMLEFT", 0, 0)
+	shade:SetPoint("TOPRIGHT", d.hp, "RIGHT", 0, 0)
+	shade:SetGradientAlpha("VERTICAL", 0, 0, 0, 0.35, 0, 0, 0, 0)
+	local shine = d.hp:CreateTexture(nil, "OVERLAY")
+	shine:SetTexture(1, 1, 1, 0.18)
+	shine:SetPoint("TOPLEFT", d.hp, "TOPLEFT", 0, 0)
+	shine:SetPoint("TOPRIGHT", d.hp, "TOPRIGHT", 0, 0)
+	shine:SetHeight(1)
+	-- health: "31.2k · 74%" inside the bar
+	d.hpText = ns:CreateText(d.hp, 12, true, "RIGHT")
+	d.hpText:SetPoint("RIGHT", d.hp, "RIGHT", -4, 0)
 	-- kill target helper mark (red cross / blue square), left of the health text
 	d.mark = d.hp:CreateTexture(nil, "OVERLAY")
-	d.mark:SetSize(16, 16)
+	d.mark:SetSize(18, 18)
 	d.mark:SetPoint("RIGHT", d.hpText, "LEFT", -2, 0)
 	d.mark:Hide()
 
-	d.name = ns:CreateText(f, 13, true, "LEFT")
-	d.name:SetPoint("BOTTOMLEFT", d.hp, "TOPLEFT", 0, 3)
-	d.num = ns:CreateText(f, 13, true, "RIGHT")
-	d.num:SetPoint("BOTTOMRIGHT", d.hp, "TOPRIGHT", 0, 3)
+	d.name = ns:CreateText(f, 15, true, "LEFT")
+	d.name:SetPoint("BOTTOMLEFT", d.hp, "TOPLEFT", 1, 4)
+	d.num = ns:CreateText(f, 15, true, "RIGHT")
+	d.num:SetPoint("BOTTOMRIGHT", d.hp, "TOPRIGHT", 0, 4)
 	d.name:SetPoint("RIGHT", d.num, "LEFT", -4, 0)
 
-	d.castbar = ns:CreateBar(f, 128, 6)
+	d.castbar = ns:CreateBar(f, PLATE_W, 8)
 	d.castbar:SetPoint("TOPLEFT", d.hp, "BOTTOMLEFT", 0, -3)
 	d.castbar:SetPoint("TOPRIGHT", d.hp, "BOTTOMRIGHT", 0, -3)
 	d.castbar:Hide()
@@ -181,19 +196,19 @@ local function Setup(plate)
 	end
 
 	-- auras: one big crowd-control icon, then a row of your debuffs
-	d.big = ns:CreateIcon(f, 36, 14)
+	d.big = ns:CreateIcon(f, 40, 15)
 	d.mine = {}
-	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 22, 11) end
+	for i = 1, 5 do d.mine[i] = ns:CreateIcon(f, 24, 12) end
 
 	-- class icon: always on the left of the health bar (bigger on your target)
-	d.classIcon = ns:CreateIcon(f, 20)
+	d.classIcon = ns:CreateIcon(f, 24)
 	d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 	d.classIcon:SetPoint("RIGHT", d.hp, "LEFT", -5, 0)
 
 	-- raid markers (skull, X...) go on the right so they never cover the class icon
 	raidIcon:ClearAllPoints()
 	raidIcon:SetPoint("LEFT", d.hp, "RIGHT", 4, 0)
-	raidIcon:SetSize(16, 16)
+	raidIcon:SetSize(20, 20)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
 	plates[plate] = d
@@ -249,13 +264,13 @@ local function LayoutAuras(d, anchorTop, friendly, guid, unit)
 		local a = mine[i]
 		if a then
 			icon:ClearAllPoints()
-			icon:SetPoint("BOTTOMLEFT", anchorTop, "TOPLEFT", (i - 1) * 25, y)
+			icon:SetPoint("BOTTOMLEFT", anchorTop, "TOPLEFT", (i - 1) * 27, y)
 			icon:Set(a.icon, nil, a.dur, (not a.noTimer) and a.expires or nil)
 		else
 			icon:Clear()
 		end
 	end
-	if #mine > 0 then y = y + 22 + 5 end
+	if #mine > 0 then y = y + 24 + 5 end
 	if best then
 		d.big:ClearAllPoints()
 		d.big:SetPoint("BOTTOM", anchorTop, "TOP", 0, y)
@@ -281,7 +296,7 @@ end
 
 local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.isTotem = true
-	d.hp:SetSize(64, 5)
+	d.hp:SetSize(PLATE_W / 2, 8) -- totems: half-size plate
 	if friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
 	else
@@ -292,7 +307,7 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
 	-- the icon is the important part: big and centered above the small bar
-	d.classIcon:SetSize(22, 22)
+	d.classIcon:SetSize(28, 28)
 	d.classIcon:ClearAllPoints()
 	d.classIcon:SetPoint("BOTTOM", d.hp, "TOP", 0, 3)
 	d.classIcon.tex:SetTexture(icon)
@@ -362,8 +377,8 @@ local function UpdatePlate(plate, d)
 
 	-- size + color
 	-- same size for friends and enemies (bigger when targeted); friends are always green
-	local w, h = 128, 12
-	if isTarget then w, h = 150, 14 end
+	local w, h = PLATE_W, PLATE_H
+	if isTarget then w, h = PLATE_W_TARGET, PLATE_H_TARGET end
 	d.hp:SetSize(w, h)
 	if kind == "friendlyPet" then
 		d.hp:SetStatusBarColor(colors.channel[1], colors.channel[2], colors.channel[3]) -- friendly pets: blue
@@ -377,7 +392,7 @@ local function UpdatePlate(plate, d)
 	ns:SetHighlight(d.hp, isTarget)
 
 	-- icon on the left for everyone: class icon for players, creature-type icon for NPCs
-	local size = isTarget and 24 or 20
+	local size = isTarget and 30 or 24
 	d.classIcon:SetSize(size, size)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if not coords and unit and UnitIsPlayer(unit) then
@@ -414,7 +429,7 @@ local function UpdatePlate(plate, d)
 		end
 		if d.wasTargetFont ~= isTarget then
 			d.wasTargetFont = isTarget
-			ns:Font(d.hpText, isTarget and 11 or 10, true)
+			ns:Font(d.hpText, isTarget and 13 or 12, true)
 		end
 		-- kill target helper: red cross (KILL) / blue square (CC) next to the arena number
 		local icon = (not friendly) and ((name and name == ns.killName and ns.KILL_ICON) or (name and name == ns.ccName and ns.CC_ICON)) or nil
@@ -428,7 +443,7 @@ local function UpdatePlate(plate, d)
 		d.num:SetText((not friendly and arena) and tostring(arena) or "")
 		if d.wasTarget ~= isTarget then
 			d.wasTarget = isTarget
-			ns:Font(d.name, isTarget and 14 or 13, true)
+			ns:Font(d.name, isTarget and 16 or 15, true)
 		end
 	end
 
