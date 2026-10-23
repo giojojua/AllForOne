@@ -66,6 +66,28 @@ function ns:CreateText(parent, size, bold, justify, layer)
 	return fs
 end
 
+-- Modern bar look (same as the nameplates): glossy light top half, darker bottom half
+function ns:Gloss(bar)
+	local gloss = bar:CreateTexture(nil, "OVERLAY")
+	gloss:SetTexture(1, 1, 1, 1)
+	gloss:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+	gloss:SetPoint("BOTTOMRIGHT", bar, "RIGHT", 0, 0)
+	gloss:SetGradientAlpha("VERTICAL", 1, 1, 1, 0.06, 1, 1, 1, 0.28)
+	local shade = bar:CreateTexture(nil, "OVERLAY")
+	shade:SetTexture(1, 1, 1, 1)
+	shade:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
+	shade:SetPoint("TOPRIGHT", bar, "RIGHT", 0, 0)
+	shade:SetGradientAlpha("VERTICAL", 0, 0, 0, 0.3, 0, 0, 0, 0.05)
+	bar.gloss, bar.shade = gloss, shade
+end
+
+-- Empty part of a bar: near-black with a slight top-to-bottom gradient (same everywhere)
+function ns:BarBackground(frame)
+	if not frame.fill then return end
+	frame.fill:SetTexture(1, 1, 1, 1)
+	frame.fill:SetGradient("VERTICAL", 0.045, 0.047, 0.055, 0.12, 0.125, 0.14)
+end
+
 function ns:CreateBar(parent, w, h)
 	local bar = CreateFrame("StatusBar", nil, parent)
 	bar:SetSize(w, h)
@@ -73,6 +95,8 @@ function ns:CreateBar(parent, w, h)
 	bar:SetMinMaxValues(0, 1)
 	bar:SetValue(1)
 	ns:Skin(bar)
+	ns:BarBackground(bar)
+	ns:Gloss(bar)
 	return bar
 end
 
