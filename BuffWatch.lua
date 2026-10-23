@@ -6,7 +6,10 @@ local _, ns = ...
 local colors = ns.colors
 
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
-local SIZE, GAP, PER_ROW = 30, 4, 7 -- 7 per row: stops before the bags + menu strip
+local SIZE, GAP, PER_ROW = 36, 4, 9 -- same size as the action buttons
+-- the gap between the action bars (465px wide, centered) and the menu strip (276px, 24px from
+-- the right edge) is about 1192..1620 on a 1920 screen: the tracker is centered in it
+local AREA_W, AREA_X = 400, 446
 
 ----------------------------------------------------------------------
 -- Buffs that count as the same thing (single / group version, Dalaran version...)
@@ -134,14 +137,12 @@ local holder
 local icons = {}
 
 local function MakeIcon(i)
-	local icon = ns:CreateIcon(holder, SIZE, 11)
-	local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
-	icon:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", col * (SIZE + GAP), row * (SIZE + GAP))
+	local icon = ns:CreateIcon(holder, SIZE, 13)
 	-- missing: red wash + "!"
 	icon.wash = icon:CreateTexture(nil, "OVERLAY")
 	icon.wash:SetAllPoints(icon.tex)
 	icon.wash:SetTexture(colors.danger[1], colors.danger[2], colors.danger[3], 0.35)
-	icon.bang = ns:CreateText(icon.overlay or icon, 18, true, "CENTER")
+	icon.bang = ns:CreateText(icon.overlay or icon, 22, true, "CENTER")
 	icon.bang:SetPoint("CENTER", 0, 0)
 	icon.bang:SetText("!")
 	icon.bang:SetTextColor(1, 0.25, 0.25)
@@ -194,8 +195,15 @@ Update = function()
 	local now = GetTime()
 	-- nothing to nag about while dead
 	local dead = not ns.testing and UnitIsDeadOrGhost("player")
+	-- rows of PER_ROW from the bottom up, each row centered in the area
+	local n = #list
 	for i, e in ipairs(list) do
 		local icon = icons[i] or MakeIcon(i)
+		local row, col = floor((i - 1) / PER_ROW), (i - 1) % PER_ROW
+		local inRow = math.min(PER_ROW, n - row * PER_ROW)
+		local rowW = inRow * (SIZE + GAP) - GAP
+		icon:ClearAllPoints()
+		icon:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", (AREA_W - rowW) / 2 + col * (SIZE + GAP), row * (SIZE + GAP))
 		if dead then icon:Hide() else Show(icon, e, have, now) end
 	end
 	for i = #list + 1, #icons do icons[i]:Clear() end
@@ -206,9 +214,9 @@ ns.buffWatchIcons = icons
 ns:Listen("LOGIN", function()
 	BuildSets()
 	holder = CreateFrame("Frame", nil, ns.root)
-	holder:SetSize(PER_ROW * (SIZE + GAP) - GAP, 3 * (SIZE + GAP) - GAP)
-	-- right of the action bars (they're 465px wide, centered), bottom row lined up with them
-	ns:Mover("buffwatch", "BUFF TRACKER", holder, "BOTTOMLEFT", "BOTTOM", 246, 30)
+	holder:SetSize(AREA_W, 3 * (SIZE + GAP) - GAP)
+	-- centered between the action bars and the menu, bottom row lined up with the bottom bar
+	ns:Mover("buffwatch", "BUFF TRACKER", holder, "BOTTOM", "BOTTOM", AREA_X, 30)
 	Update()
 end)
 ns:On("UNIT_AURA", function(_, unit) if unit == "player" then Update() end end)
