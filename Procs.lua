@@ -42,6 +42,42 @@ local function List()
 	return mine
 end
 
+-- Short buffs that showed up on you (trinket procs, enchant procs...), newest first, per
+-- character: they're listed in the window so you can track one that isn't up right now.
+local function Seen()
+	ns.db.procs = ns.db.procs or {}
+	local db = ns.db.procs
+	db.seen = db.seen or {}
+	local me = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+	db.seen[me] = db.seen[me] or {}
+	return db.seen[me]
+end
+
+function ns:NoteSeenBuff(name, icon, duration)
+	-- procs last a few seconds to a minute; skip long buffs and permanent ones
+	if not name or not duration or duration <= 0 or duration > 60 then return end
+	local seen = Seen()
+	for i, e in ipairs(seen) do
+		if e.name == name then table.remove(seen, i) break end
+	end
+	table.insert(seen, 1, { name = name, icon = icon })
+	while #seen > 12 do table.remove(seen) end
+end
+
+-- the buff your equipped trinkets give when you use them (on-use trinkets)
+local function TrinketBuffs()
+	local out = {}
+	for slot = 13, 14 do
+		local link = GetInventoryItemLink("player", slot)
+		local spell = link and GetItemSpell and GetItemSpell(link)
+		if spell and not (ns.Trinket and ns.Trinket[spell]) then -- not the PvP trinket
+			local _, _, icon = GetSpellInfo(spell)
+			out[#out + 1] = { name = spell, icon = icon or GetInventoryItemTexture("player", slot) }
+		end
+	end
+	return out
+end
+
 function ns:IsProc(name)
 	return name ~= nil and List()[strlower(name)] ~= nil
 end
@@ -130,7 +166,7 @@ local function Header(parent, text)
 	return h
 end
 
-local pools = { tracked = {}, suggest = {}, buffs = {} }
+local pools = { tracked = {}, suggest = {}, buffs = {}, trinkets = {}, seen = {} }
 
 local function Fill(pool, entries, y, actionLabel, onAction, emptyText)
 	for i, e in ipairs(entries) do
@@ -197,6 +233,22 @@ Refresh = function()
 	panel.hSuggest:SetPoint("TOPLEFT", PAD, -y); y = y + 20
 	y = Fill(pools.suggest, suggest, y, "+", function(e) AddProc(e.name, e.icon) end,
 		"No more suggestions for your class.") + 10
+	-- your trinkets (on-use) and short buffs seen on you lately (trinket / enchant procs)
+	local trinkets, tseen = {}, {}
+	for _, e in ipairs(TrinketBuffs()) do
+		if not list[strlower(e.name)] and not tseen[e.name] then tseen[e.name] = true; trinkets[#trinkets + 1] = e end
+	end
+	local recent = {}
+	for _, e in ipairs(Seen()) do
+		if not list[strlower(e.name)] and not seen[e.name] and not tseen[e.name] then recent[#recent + 1] = e end
+		if #recent >= 6 then break end
+	end
+	panel.hTrinkets:SetPoint("TOPLEFT", PAD, -y); y = y + 20
+	y = Fill(pools.trinkets, trinkets, y, "+", function(e) AddProc(e.name, e.icon) end,
+		"No on-use trinket equipped.") + 10
+	panel.hSeen:SetPoint("TOPLEFT", PAD, -y); y = y + 20
+	y = Fill(pools.seen, recent, y, "+", function(e) AddProc(e.name, e.icon) end,
+		"Nothing yet: trinket and enchant procs show up here after they fire once.") + 10
 	panel.hBuffs:SetPoint("TOPLEFT", PAD, -y); y = y + 20
 	y = Fill(pools.buffs, buffs, y, "+", function(e) AddProc(e.name, e.icon) end,
 		"No other buffs on you right now.") + PAD
@@ -258,6 +310,8 @@ local function CreatePanel()
 	panel.hTracked = Header(panel, "TRACKED")
 	panel.hSuggest = Header(panel, "SUGGESTED FOR YOUR CLASS")
 	panel.hBuffs = Header(panel, "YOUR BUFFS RIGHT NOW")
+	panel.hTrinkets = Header(panel, "YOUR TRINKETS (ON USE)")
+	panel.hSeen = Header(panel, "PROCS SEEN ON YOU LATELY (TRINKETS, ENCHANTS)")
 
 	panel:SetScript("OnShow", Refresh)
 	panel:RegisterEvent("UNIT_AURA")

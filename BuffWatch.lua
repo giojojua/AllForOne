@@ -44,6 +44,14 @@ local SUGGEST = {
 }
 local suggest = {}
 
+-- weapon enchants (Spellstone, Firestone, poisons, oils, shaman imbues...) are not auras:
+-- one special entry per hand
+local WEAPON = {
+	["#mainhand"] = { slot = 16, label = "Main-hand weapon enchant" },
+	["#offhand"] = { slot = 17, label = "Off-hand weapon enchant" },
+}
+ns.WEAPON_ENCHANT_KEYS = WEAPON
+
 local function BuildSets()
 	wipe(groupOf)
 	for _, ids in ipairs(SAME) do
@@ -76,7 +84,7 @@ local function List()
 	return db.chars[me]
 end
 
-local Update, Refresh -- set below
+local Update, Refresh, AddWeapon -- set below
 
 local function AddBuff(name, icon)
 	if not name or name == "" then return end
@@ -85,8 +93,17 @@ local function AddBuff(name, icon)
 	if Refresh then Refresh() end
 end
 
+-- a weapon enchant entry: stored under its key, shown with its label
+AddWeapon = function(key)
+	local w = WEAPON[key]
+	if not w then return end
+	List()[key] = { name = w.label, key = key, icon = GetInventoryItemTexture("player", w.slot) }
+	if Update then Update() end
+	if Refresh then Refresh() end
+end
+
 local function RemoveBuff(name)
-	List()[strlower(name)] = nil
+	List()[(name:sub(1, 1) == "#") and name or strlower(name)] = nil
 	if Update then Update() end
 	if Refresh then Refresh() end
 end
@@ -112,6 +129,43 @@ local function Resolve(text)
 	return text, nil
 end
 
+----------------------------------------------------------------------
+-- Weapon enchants (Spellstone, Firestone, poisons, oils, shaman imbues...) aren't auras:
+-- they're tracked as two special entries, one per hand.
+----------------------------------------------------------------------
+
+-- the enchant's name from the weapon tooltip (the green "Spellstone (1 hour)" line)
+local scan
+local function EnchantName(slot)
+	if not scan then
+		scan = CreateFrame("GameTooltip", "AllForOneEnchantScan", nil, "GameTooltipTemplate")
+		scan:SetOwner(UIParent, "ANCHOR_NONE")
+	end
+	scan:ClearLines()
+	scan:SetOwner(UIParent, "ANCHOR_NONE")
+	if not scan:SetInventoryItem("player", slot) then return nil end
+	for i = 2, scan:NumLines() do
+		local fs = _G["AllForOneEnchantScanTextLeft" .. i]
+		local text = fs and fs:GetText()
+		if text then
+			local name = text:match("^(.-) %(%d+ [^%)]+%)$")
+			local r, g, b = fs:GetTextColor()
+			if name and g > 0.9 and r < 0.2 then return name end
+		end
+	end
+end
+
+-- your weapon enchants right now: key -> { icon, expires, name }
+local function CurrentEnchants()
+	local out = {}
+	if not GetWeaponEnchantInfo then return out end
+	local hasMH, mhMs, _, hasOH, ohMs = GetWeaponEnchantInfo()
+	local now = GetTime()
+	if hasMH then out["#mainhand"] = { icon = GetInventoryItemTexture("player", 16), expires = mhMs and now + mhMs / 1000, name = EnchantName(16) } end
+	if hasOH then out["#offhand"] = { icon = GetInventoryItemTexture("player", 17), expires = ohMs and now + ohMs / 1000, name = EnchantName(17) } end
+	return out
+end
+
 -- your buffs right now: lower-case name -> { icon, expires }
 local function CurrentBuffs()
 	local have = {}
@@ -120,6 +174,7 @@ local function CurrentBuffs()
 		if not name then break end
 		have[strlower(name)] = { icon = icon, expires = (duration and duration > 0) and expires or nil }
 	end
+	for key, e in pairs(CurrentEnchants()) do have[key] = e end
 	return have
 end
 
@@ -148,6 +203,7 @@ local function MakeIcon(i)
 	icon.bang:SetPoint("CENTER", 0, 0)
 	icon.bang:SetText("!")
 	icon.bang:SetTextColor(1, 0.25, 0.25)
+	icon.onExpire = function() if Update then Update() end end -- e.g. a weapon enchant running out
 	icon:EnableMouse(true)
 	icon:SetScript("OnEnter", function(self)
 		if not self.buffName then return end
@@ -163,8 +219,9 @@ local function MakeIcon(i)
 end
 
 local function Show(icon, e, have, now)
-	icon.buffName = e.name
-	local b = Find(have, strlower(e.name))
+	local key = e.key or strlower(e.name)
+	local b = Find(have, key)
+	icon.buffName = (b and b.name) and (e.name .. ": " .. b.name) or e.name
 	if b then
 		icon.missing = false
 		-- time left only when it's running out (under 5 minutes)
@@ -176,7 +233,8 @@ local function Show(icon, e, have, now)
 		icon.bang:Hide()
 	else
 		icon.missing = true
-		icon:Set(e.icon or QUESTION)
+		local w = WEAPON[key]
+		icon:Set((w and GetInventoryItemTexture("player", w.slot)) or e.icon or QUESTION)
 		icon.tex:SetDesaturated(true)
 		icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
 		icon.wash:Show()
@@ -222,6 +280,7 @@ ns:Listen("LOGIN", function()
 	Update()
 end)
 ns:On("UNIT_AURA", function(_, unit) if unit == "player" then Update() end end)
+ns:On("UNIT_INVENTORY_CHANGED", function(_, unit) if unit == "player" then Update(); if Refresh then Refresh() end end end)
 ns:On("PLAYER_ENTERING_WORLD", function() Update() end)
 ns:On("PLAYER_DEAD", function() Update() end)
 ns:On("PLAYER_UNGHOST", function() Update() end)
@@ -267,7 +326,7 @@ local function Header(parent, text)
 	return h
 end
 
-local pools = { tracked = {}, suggest = {}, buffs = {} }
+local pools = { tracked = {}, suggest = {}, weapons = {}, buffs = {} }
 
 local function Fill(pool, entries, y, actionLabel, onAction, emptyText)
 	for i, e in ipairs(entries) do
@@ -329,11 +388,25 @@ Refresh = function()
 
 	local y = 96
 	panel.hTracked:SetPoint("TOPLEFT", PAD, -y); y = y + 20
-	y = Fill(pools.tracked, tracked, y, "×", function(e) RemoveBuff(e.name) end,
+	y = Fill(pools.tracked, tracked, y, "×", function(e) RemoveBuff(e.key or e.name) end,
 		"Nothing yet. Add a buff below or type its name above.") + 10
 	panel.hSuggest:SetPoint("TOPLEFT", PAD, -y); y = y + 20
 	y = Fill(pools.suggest, sug, y, "+", function(e) AddBuff(e.name, e.icon) end,
 		"No more suggestions for your class.") + 10
+	-- weapon enchants (Spellstone, Firestone, poisons, oils...): one entry per hand
+	local weapons = {}
+	local cur = CurrentEnchants()
+	for key, w in pairs(WEAPON) do
+		if not list[key] and GetInventoryItemLink("player", w.slot) then
+			local c = cur[key]
+			weapons[#weapons + 1] = { key = key, name = w.label .. ((c and c.name) and (" (now: " .. c.name .. ")") or ""),
+				icon = GetInventoryItemTexture("player", w.slot) }
+		end
+	end
+	table.sort(weapons, function(a, b) return a.key > b.key end) -- main hand first
+	panel.hWeapons:SetPoint("TOPLEFT", PAD, -y); y = y + 20
+	y = Fill(pools.weapons, weapons, y, "+", function(e) AddWeapon(e.key) end,
+		"Both hands tracked (or no weapon equipped).") + 10
 	panel.hBuffs:SetPoint("TOPLEFT", PAD, -y); y = y + 20
 	y = Fill(pools.buffs, buffs, y, "+", function(e) AddBuff(e.name, e.icon) end,
 		"No other buffs on you right now.") + PAD
@@ -394,6 +467,7 @@ local function CreatePanel()
 	panel.hTracked = Header(panel, "TRACKED")
 	panel.hSuggest = Header(panel, "SUGGESTED FOR YOUR CLASS")
 	panel.hBuffs = Header(panel, "YOUR BUFFS RIGHT NOW")
+	panel.hWeapons = Header(panel, "WEAPON ENCHANTS (SPELLSTONE, POISONS, OILS...)")
 
 	panel:SetScript("OnShow", Refresh)
 	panel:RegisterEvent("UNIT_AURA")
