@@ -6,10 +6,12 @@ local _, ns = ...
 local colors = ns.colors
 
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
-local SIZE, GAP, PER_ROW = 46, 4, 8 -- bigger than the action buttons, so a missing buff stands out
+local SIZE, GAP, PER_ROW = 46, 4, 4 -- bigger than the action buttons, so a missing buff stands out
 -- the gap between the action bars (465px wide, centered) and the menu strip (276px, 24px from
 -- the right edge) is about 1192..1620 on a 1920 screen: the tracker is centered in it
-local AREA_W, AREA_X = 400, 446
+-- centered 100px (two icons) left of the middle of that gap; 4 per row keeps a full row
+-- clear of the action bars
+local AREA_W, AREA_X = 4 * (46 + 4) - 4, 346
 
 ----------------------------------------------------------------------
 -- Buffs that count as the same thing (single / group version, Dalaran version...)
