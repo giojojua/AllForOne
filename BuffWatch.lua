@@ -6,7 +6,7 @@ local _, ns = ...
 local colors = ns.colors
 
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
-local SIZE, GAP, PER_ROW = 36, 4, 9 -- same size as the action buttons
+local SIZE, GAP, PER_ROW = 46, 4, 8 -- bigger than the action buttons, so a missing buff stands out
 -- the gap between the action bars (465px wide, centered) and the menu strip (276px, 24px from
 -- the right edge) is about 1192..1620 on a 1920 screen: the tracker is centered in it
 local AREA_W, AREA_X = 400, 446
@@ -137,12 +137,12 @@ local holder
 local icons = {}
 
 local function MakeIcon(i)
-	local icon = ns:CreateIcon(holder, SIZE, 13)
+	local icon = ns:CreateIcon(holder, SIZE, 16)
 	-- missing: red wash + "!"
 	icon.wash = icon:CreateTexture(nil, "OVERLAY")
 	icon.wash:SetAllPoints(icon.tex)
 	icon.wash:SetTexture(colors.danger[1], colors.danger[2], colors.danger[3], 0.35)
-	icon.bang = ns:CreateText(icon.overlay or icon, 22, true, "CENTER")
+	icon.bang = ns:CreateText(icon.overlay or icon, 30, true, "CENTER")
 	icon.bang:SetPoint("CENTER", 0, 0)
 	icon.bang:SetText("!")
 	icon.bang:SetTextColor(1, 0.25, 0.25)
