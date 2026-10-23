@@ -964,11 +964,12 @@ end
 ----------------------------------------------------------------------
 function A:Trends()
 	local list = DB().matches
-	local t = { games = #list, wins = 0, comps = {}, mistakes = {}, ccOnMe = 0, kicksCast = 0, kicksLanded = 0, takenIntoReady = 0 }
+	local t = { games = #list, wins = 0, draws = 0, comps = {}, mistakes = {}, ccOnMe = 0, kicksCast = 0, kicksLanded = 0, takenIntoReady = 0 }
 	local last10 = {}
 	for i = math.max(1, #list - 9), #list do last10[i] = true end
 	for i, m in ipairs(list) do
 		if m.result == "win" then t.wins = t.wins + 1 end
+		if m.result == "draw" then t.draws = t.draws + 1 end
 		local c = t.comps[m.comp or "?"] or { games = 0, wins = 0 }
 		t.comps[m.comp or "?"] = c
 		c.games = c.games + 1
