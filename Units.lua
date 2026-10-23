@@ -159,7 +159,7 @@ end
 local function PaintHealth(bar, nameText, unit)
 	local r, g, b = HealthColor(unit)
 	if ns.db.classColoredBars then
-		bar:SetStatusBarColor(r, g, b)
+		bar:SetStatusBarColor(ns:Soften(r, g, b))
 		nameText:SetTextColor(1, 1, 1)
 	else
 		bar:SetStatusBarColor(colors.missing[1], colors.missing[2], colors.missing[3])

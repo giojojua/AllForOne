@@ -29,7 +29,7 @@ function Cell:Paint()
 	self.health:SetValue(cur or 0)
 	local r, g, b = ns:ClassColor(class)
 	if ns.db.classColoredBars then
-		self.health:SetStatusBarColor(r, g, b)
+		self.health:SetStatusBarColor(ns:Soften(r, g, b))
 		self.name:SetTextColor(1, 1, 1)
 	else
 		self.health:SetStatusBarColor(colors.missing[1], colors.missing[2], colors.missing[3])
