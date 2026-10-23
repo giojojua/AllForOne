@@ -95,6 +95,9 @@ A profile is a snapshot of your whole UI: where every part sits and how big it i
 ### Move and resize anything
 Type `/afo unlock`. Every part gets a labeled box: drag it to move, use the mouse wheel to resize (50–200%), right-click to put that part back. Type `/afo lock` to finish. Positions are saved per character; `/afo reset` restores the default layout. Moving only works out of combat (a game rule), and combat ends move mode automatically.
 
+### Buff tracker (missing buffs)
+Right of the action bars. Type `/afo buffs` (or **CHOOSE BUFFS** in `/afo`) to pick the buffs you want up: your buffs right now and suggestions for your class are listed, **+** adds one. Each tracked buff shows its icon (with time left once it's under 5 minutes); when it's **missing** the icon turns grey with a red edge and a red **!**. Group versions count too (Arcane Brilliance for Arcane Intellect, Prayer of Fortitude, Gift of the Wild, Greater Blessings...). Each character has its own list. Commands: `/afo buffs add <name or ID>`, `/afo buffs remove <name or ID>`, `/afo buffs reset`.
+
 ### Choose which procs to show
 Procs appear as glowing icons next to your character. Nothing is tracked until you pick it: type `/afo procs` to open the proc window.
 - **Add box:** type a buff name or spell ID and press Enter.
@@ -116,6 +119,7 @@ Each character has its own list (a new character starts from your old shared lis
 | `/afo test` | Toggle sample arena data on every frame |
 | `/afo test bg` | Sample battleground: raid frames, flag carriers, capture timers |
 | `/afo procs` | Open the proc window |
+| `/afo buffs` | Open the buff tracker (missing buffs) |
 | `/afo scale 0.9` | Resize the whole UI (0.5–2) |
 | `/afo colors` | Class-colored bars on/off |
 | `/afo menu 0.6` | Idle opacity of bags + menu (0–1, default 0.6) |
