@@ -200,12 +200,49 @@ local function StartCooldown(srcGUID, spellName, spellId)
 		ns:NoteCooldownUsed(ownerGUID, class, spellName)
 	end
 	if rec or reset then ns:Send("COOLDOWN", ownerGUID) end
-	local spec = ns.Spec[spellName]
-	if spec and spec.class == class and ns.specs[ownerGUID] ~= spec.spec then
-		ns.specs[ownerGUID] = spec.spec
-		ns:Send("SPEC", ownerGUID)
+	ns:NoteSpec(ownerGUID, class, spellName)
+end
+
+-- A spec-only spell / talent buff / proc seen from a player (or their pet) sets their spec.
+function ns:NoteSpec(guid, class, spellName)
+	local spec = guid and spellName and ns.Spec[spellName]
+	if not spec then return end
+	if not class and GetPlayerInfoByGUID then class = select(2, GetPlayerInfoByGUID(guid)) end
+	if spec.class ~= class or ns.specs[guid] == spec.spec then return end
+	ns.specs[guid] = spec.spec
+	ns:Send("SPEC", guid)
+end
+
+-- Who really did it: pets count for their owner (arena / party pets via the unit map)
+local function SpecSource(srcGUID, srcFlags)
+	local owner = ns.unitOf[srcGUID]
+	if owner then
+		local g = UnitGUID(owner)
+		if g then return g, select(2, UnitClass(owner)) end
+	end
+	if srcFlags and band(srcFlags, PLAYER_FLAG) > 0 then return srcGUID end
+end
+local SPEC_EVENTS = {
+	SPELL_CAST_START = true, SPELL_CAST_SUCCESS = true, SPELL_SUMMON = true, SPELL_DAMAGE = true,
+	SPELL_PERIODIC_DAMAGE = true, SPELL_HEAL = true, SPELL_PERIODIC_HEAL = true, SPELL_AURA_APPLIED = true,
+	SPELL_AURA_REFRESH = true, SPELL_MISSED = true, SPELL_ENERGIZE = true, SPELL_INTERRUPT = true,
+}
+
+-- Talent auras / forms on an enemy (Shadowform, Tree of Life, Moonkin, Trueshot...): read as
+-- soon as you can see them, before they cast anything
+local function ScanSpec(unit)
+	if not (UnitExists(unit) and UnitIsPlayer(unit)) then return end
+	for i = 1, 40 do
+		local name, _, _, _, _, _, _, caster = UnitAura(unit, i, "HELPFUL")
+		if not name then break end
+		-- the buff tells us about whoever cast it (self-buffs: this unit; Trueshot / Moonkin
+		-- auras: their teammate). Unknown caster: skip, it could be a teammate of the same class.
+		if caster and ns.Spec[name] and UnitExists(caster) and UnitIsPlayer(caster) then
+			ns:NoteSpec(UnitGUID(caster), select(2, UnitClass(caster)), name)
+		end
 	end
 end
+ns.ScanSpec = ScanSpec
 
 ----------------------------------------------------------------------
 -- Diminishing returns icon: if YOU have a spell in that category, the DR icon is always your
@@ -311,6 +348,11 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, src
 	if srcName and srcFlags and band(srcFlags, PLAYER_FLAG) > 0 then ns.nameToGUID[ShortName(srcName)] = srcGUID end
 	if dstName and dstFlags and band(dstFlags, PLAYER_FLAG) > 0 then ns.nameToGUID[ShortName(dstName)] = dstGUID end
 
+	if SPEC_EVENTS[event] and spellName and ns.Spec[spellName] then
+		local g, class = SpecSource(srcGUID, srcFlags)
+		if g then ns:NoteSpec(g, class, spellName) end
+	end
+
 	if event == "SPELL_CAST_SUCCESS" or event == "SPELL_SUMMON" then
 		StartCooldown(srcGUID, spellName, spellId)
 	elseif event == "SPELL_AURA_APPLIED" or event == "SPELL_AURA_REFRESH" then
@@ -345,3 +387,14 @@ ns:On("PLAYER_ENTERING_WORLD", function()
 end)
 ns:On("PLAYER_TALENT_UPDATE", UpdatePlayerSpec)
 ns:On("ACTIVE_TALENT_GROUP_CHANGED", UpdatePlayerSpec)
+
+-- enemy (and party) buffs: forms and talent auras tell the spec before the first cast
+ns:On("UNIT_AURA", function(_, unit)
+	if unit and (unit:match("^arena%d$") or unit:match("^party%d$")) then ScanSpec(unit) end
+end)
+ns:On("ARENA_OPPONENT_UPDATE", function(_, unit)
+	if unit and unit:match("^arena%d$") then ScanSpec(unit) end
+end)
+ns:On("PLAYER_TARGET_CHANGED", function() ScanSpec("target") end)
+ns:On("PLAYER_FOCUS_CHANGED", function() ScanSpec("focus") end)
+ns:On("UPDATE_MOUSEOVER_UNIT", function() ScanSpec("mouseover") end)
