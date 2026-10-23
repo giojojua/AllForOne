@@ -84,6 +84,7 @@ end
 -- plate size: bigger, modern-looking bars (your target a bit bigger still)
 local PLATE_W, PLATE_H = 160, 16
 local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
+local logCasts -- set below (combat-log casts by name)
 local CAST_H, CAST_H_TARGET = 6, 7 -- the cast strip always sits under the health bar
 
 local function Classify(r, g, b)
@@ -183,6 +184,14 @@ local function Setup(plate)
 	d.castbar:SetMinMaxValues(0, 1)
 	ns:Gloss(d.castbar)
 	d.castbar:Hide()
+	-- smooth fill between plate updates
+	d.castbar:SetScript("OnUpdate", function(bar)
+		if not d.castStart then return bar:Hide() end
+		local now = GetTime()
+		if now >= d.castEnd then d.castStart = nil return bar:Hide() end
+		local pct = (now - d.castStart) / (d.castEnd - d.castStart)
+		bar:SetValue(d.castChannel and (1 - pct) or pct)
+	end)
 
 	d.pips = {}
 	for i = 1, 5 do
@@ -286,6 +295,25 @@ local function TotemIcon(name)
 	if not name or not ns.Totems then return nil end
 	return ns.Totems[name] or ns.Totems[(name:gsub("%s+[IVX]+$", ""))]
 end
+
+-- Casts seen in the combat log, by caster name (for plates we have no unit for)
+logCasts = {}
+local function Short(n) return n and n:match("^[^-]+") end
+ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, _, srcName, _, _, dstName, _, spellId)
+	if event == "SPELL_CAST_START" then
+		local castTime = srcName and spellId and select(7, GetSpellInfo(spellId))
+		if castTime and castTime > 0 then
+			local now = GetTime()
+			local c = { start = now, finish = now + castTime / 1000 }
+			-- plates show names without the realm, the combat log may add "-Realm"
+			logCasts[srcName], logCasts[Short(srcName)] = c, c
+		end
+	elseif event == "SPELL_CAST_SUCCESS" or event == "SPELL_CAST_FAILED" then
+		if srcName then logCasts[srcName], logCasts[Short(srcName)] = nil, nil end
+	elseif event == "SPELL_INTERRUPT" or event == "UNIT_DIED" then
+		if dstName then logCasts[dstName], logCasts[Short(dstName)] = nil, nil end
+	end
+end)
 
 local function ShortHP(n)
 	if n >= 1e6 then return format("%.1fm", n / 1e6) end
@@ -453,16 +481,44 @@ local function UpdatePlate(plate, d)
 		end
 	end
 
-	-- cast bar (Blizzard shows nameplate casts for your target)
-	if d.cast:IsShown() then
-		local cmin, cmax = d.cast:GetMinMaxValues()
-		d.castbar:SetMinMaxValues(cmin, cmax)
-		d.castbar:SetValue(d.cast:GetValue())
-		local c = d.shield:IsShown() and colors.locked or colors.kick
-		d.castbar:SetStatusBarColor(c[1], c[2], c[3])
-		d.castbar:Show()
-	else
-		d.castbar:Hide()
+	-- cast strip: Blizzard only fills its own plate cast bar for your target, so read the cast
+	-- from the unit when we have one (target / focus / arena / mouseover / party), else from the
+	-- combat log by name (any enemy that starts a cast)
+	if not d.isTotem then
+		local spell, start, finish, locked, channel
+		local u = unit or (isTarget and "target") or nil
+		if u then
+			local _, _, _, _, s1, e1, _, _, nk = UnitCastingInfo(u)
+			if s1 then
+				spell, start, finish, locked = true, s1 / 1000, e1 / 1000, nk
+			else
+				local _, _, _, _, s2, e2, _, nk2 = UnitChannelInfo(u)
+				if s2 then spell, start, finish, locked, channel = true, s2 / 1000, e2 / 1000, nk2, true end
+			end
+		end
+		if not spell and d.cast:IsShown() then
+			local cmin, cmax = d.cast:GetMinMaxValues()
+			local v = d.cast:GetValue()
+			if cmax and cmax > cmin then
+				-- Blizzard bar counts in seconds (min 0, max cast time)
+				spell, start, finish = true, GetTime() - (v - cmin), GetTime() + (cmax - v)
+				locked = d.shield:IsShown()
+			end
+		end
+		local lc = not spell and name and logCasts[name]
+		if lc and lc.finish > GetTime() then
+			spell, start, finish, locked = true, lc.start, lc.finish, false
+		end
+		if spell and finish > start then
+			d.castStart, d.castEnd, d.castChannel = start, finish, channel
+			local c = locked and colors.locked or (channel and colors.channel) or colors.kick
+			d.castbar:SetStatusBarColor(c[1], c[2], c[3])
+			d.castbar:SetMinMaxValues(0, 1)
+			if not d.castbar:IsShown() then d.castbar:Show() end
+		else
+			d.castStart = nil
+			d.castbar:Hide()
+		end
 	end
 
 	-- combo points under your target's plate: 5 red segments as wide as the health bar
