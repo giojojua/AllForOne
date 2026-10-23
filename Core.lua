@@ -177,6 +177,16 @@ function ns:ClassColor(class)
 	return 0.6, 0.6, 0.6
 end
 
+-- Health bar fill: the same hue a bit darker and less saturated, so big bars
+-- don't glare (names and text keep the full class color)
+function ns:Soften(r, g, b)
+	return r * 0.78 + 0.07, g * 0.78 + 0.07, b * 0.78 + 0.07
+end
+
+function ns:BarColor(class)
+	return ns:Soften(ns:ClassColor(class))
+end
+
 function ns:Font(fs, size, bold)
 	local path = (ns.db and not ns.db.useFont) and ns.media.fallback or (bold and ns.media.fontBold or ns.media.font)
 	fs:SetFont(path, size, "OUTLINE")

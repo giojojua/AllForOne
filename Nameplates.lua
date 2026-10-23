@@ -313,7 +313,7 @@ local function UpdateTotem(d, icon, friendly, r, g, b)
 	if friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
 	else
-		d.hp:SetStatusBarColor(r, g, b)
+		d.hp:SetStatusBarColor(ns:Soften(r, g, b))
 	end
 	ns:SetHighlight(d.hp, false)
 	local min, max = d.health:GetMinMaxValues()
@@ -399,9 +399,9 @@ local function UpdatePlate(plate, d)
 	elseif friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
 	elseif kind == "enemyPlayer" then
-		d.hp:SetStatusBarColor(ns:ClassColor(class))
+		d.hp:SetStatusBarColor(ns:BarColor(class))
 	else
-		d.hp:SetStatusBarColor(r, g, b)
+		d.hp:SetStatusBarColor(ns:Soften(r, g, b))
 	end
 	ns:SetHighlight(d.hp, isTarget)
 	ns:SetHighlight(d.track, isTarget)
