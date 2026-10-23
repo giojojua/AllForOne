@@ -48,6 +48,40 @@ local TINT = {
 	normal = { 1, 1, 1 },
 }
 
+-- Macros with a target ([target=focus], [@focus], [target=mouseover,exists]...): the game
+-- checks range against your target no matter what, so read the macro ourselves and check
+-- range on the unit it would really cast on (conditions are evaluated live).
+local function MacroTarget(action)
+	if not (GetActionInfo and GetMacroBody and SecureCmdOptionParse) then return end
+	local kind, id = GetActionInfo(action)
+	if kind ~= "macro" or not id then return end
+	local body = GetMacroBody(id)
+	if not body then return end
+	for line in body:gmatch("[^\r\n]+") do
+		local cmd, args = line:match("^%s*(/%a+)%s+(.+)$")
+		cmd = cmd and cmd:lower()
+		if cmd == "/cast" or cmd == "/use" then
+			local spell, unit = SecureCmdOptionParse(args)
+			if spell and spell ~= "" then return spell, unit end
+		end
+	end
+end
+
+-- true / false when we know better than the game (macro aimed at another unit), else nil
+local function MacroOutOfRange(action)
+	local spell, unit = MacroTarget(action)
+	if not spell or not unit then return nil end
+	unit = unit:lower()
+	if unit == "target" then return nil end -- the game already checks that
+	if not UnitExists(unit) then return nil end
+	spell = spell:gsub("%s*%(.-%)%s*$", "") -- "Polymorph(Rank 1)" -> "Polymorph"
+	local r = IsSpellInRange(spell, unit)
+	if r == nil and IsItemInRange then r = IsItemInRange(spell, unit) end
+	if r == nil then return nil end
+	return r == 0
+end
+ns.MacroOutOfRange = MacroOutOfRange
+
 local function Tint(b)
 	local icon = b.afoIcon
 	if not icon then
@@ -59,7 +93,14 @@ local function Tint(b)
 	local state = "normal"
 	if ns.db.usableColors ~= false then
 		local usable, noPower = IsUsableAction(action)
-		if IsActionInRange(action) == 0 then state = "range"
+		local oor = MacroOutOfRange(action)
+		local prev = b.afoMacroRange
+		b.afoMacroRange = oor
+		-- repaint the keybind with our result (only for macros we handle, so Blizzard's own
+		-- red for normal target spells is left alone)
+		if (oor ~= nil or prev ~= nil) and b.afoHotkey then b.afoHotkey:SetVertexColor(1, 1, 1) end
+		if oor == nil then oor = (IsActionInRange(action) == 0) end
+		if oor then state = "range"
 		elseif noPower then state = "power"
 		elseif not usable then state = "unusable" end
 	end
@@ -182,9 +223,14 @@ local function SkinButton(b)
 		hotkey:SetJustifyH("RIGHT")
 		-- Blizzard re-colors it all the time: grey when in range, red when out of range.
 		-- Keep it white, and a clear red only when out of range.
+		-- Macros aimed at focus / mouseover: our own range result wins over Blizzard's.
 		local setColor = hotkey.SetVertexColor
+		b.afoHotkey = hotkey
 		hotkey.SetVertexColor = function(self, r, g, bl)
-			if r and r > 0.9 and g and g < 0.3 then
+			local mine = b.afoMacroRange
+			if mine ~= nil then
+				if mine then setColor(self, 1, 0.3, 0.3) else setColor(self, 1, 1, 1) end
+			elseif r and r > 0.9 and g and g < 0.3 then
 				setColor(self, 1, 0.3, 0.3)
 			else
 				setColor(self, 1, 1, 1)
