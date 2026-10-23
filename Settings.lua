@@ -224,6 +224,14 @@ local function Build()
 	local bgTest = Button(row2, "BG TEST", bw, function() ns:Send("TOGGLE_TEST", "bg") end)
 	bgTest:SetPoint("LEFT", reload, "RIGHT", 8, 0)
 	Add(row2, 26)
+	local row3 = CreateFrame("Frame", nil, win)
+	row3:SetSize(CW, 26)
+	local buffs = Button(row3, "CHOOSE BUFFS", bw, function()
+		win:Hide()
+		if ns.ToggleBuffWindow then ns:ToggleBuffWindow() end
+	end)
+	buffs:SetPoint("LEFT", 0, 0)
+	Add(row3, 26)
 
 	----------------------------------------------------------------
 	-- Profiles: save the whole UI (layout + these settings) under a name, load it back later

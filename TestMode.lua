@@ -97,6 +97,11 @@ local function Start(mode)
 		{ name = GetSpellInfo(57761) or "Brain Freeze", icon = Icon(57761), dur = 15, expires = now + 12 },
 	})
 	ns:ShowLoC(Icon(118), "incap", 8, now + 6)
+	-- buff tracker: Arcane Brilliance + Molten Armor on, Fire Ward missing
+	local ab, mo, fw = GetSpellInfo(43002) or "Arcane Brilliance", GetSpellInfo(43046) or "Molten Armor", GetSpellInfo(43010) or "Fire Ward"
+	ns.fakeBuffWatch = { { name = ab, icon = Icon(43002) }, { name = mo, icon = Icon(43046) }, { name = fw, icon = Icon(43010) } }
+	ns.fakeBuffHave = { [strlower(ab)] = { icon = Icon(43002) }, [strlower(mo)] = { icon = Icon(43046), expires = now + 140 } }
+	if ns.UpdateBuffWatch then ns.UpdateBuffWatch() end
 	if not bg then ns:ShowArenaSample(true) end
 	if ns.UpdateTargets then ns:UpdateTargets() end
 	ns:Send("RESOURCES_TEST", true)
@@ -125,6 +130,8 @@ local function Stop()
 	F.playerCast:Fake(nil)
 	ns:ShowProcs({})
 	ns:ShowLoC(nil)
+	ns.fakeBuffWatch, ns.fakeBuffHave = nil, nil
+	if ns.UpdateBuffWatch then ns.UpdateBuffWatch() end
 	ns:ShowArenaSample(false)
 	ns:Send("RESOURCES_TEST", false)
 	ns:Send("RAID_TEST", false)

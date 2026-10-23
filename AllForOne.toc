@@ -14,6 +14,7 @@ Units.lua
 Raid.lua
 Auras.lua
 Procs.lua
+BuffWatch.lua
 Swing.lua
 Resources.lua
 KillTarget.lua

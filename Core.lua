@@ -305,6 +305,10 @@ SlashCmdList.ALLFORONE = function(msg)
 		if ns.QuestDebug then ns:QuestDebug() end
 		return
 	end
+	if strlower(first or "") == "buffs" then
+		if ns.BuffCommand then ns:BuffCommand(rawArg) else ns:Print("the buff tracker needs a full game restart after updating the addon") end
+		return
+	end
 	if strlower(first or "") == "procs" then
 		if ns.ProcCommand then ns:ProcCommand(rawArg) else ns:Print("the proc window needs a full game restart after updating the addon") end
 		return
@@ -353,6 +357,7 @@ SlashCmdList.ALLFORONE = function(msg)
 		ns:Print("/afo reset - put every part back where it started")
 		ns:Print("/afo test - show every frame with sample arena data; /afo test bg - sample battleground")
 		ns:Print("/afo procs - open the proc window (choose which procs show next to your character)")
+		ns:Print("/afo buffs - open the buff tracker (buffs you want up; a red icon right of your bars when one is missing)")
 		ns:Print("/afo profile save|load|delete <name>, /afo profile list - save and switch whole UI versions")
 		ns:Print("/afo arena - arena analyzer (this character's last 50 matches); /afo arena test - sample report; /afo arena reset - delete this character's history")
 		ns:Print("/afo scale 0.9 - resize the whole UI at once")
