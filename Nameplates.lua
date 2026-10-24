@@ -86,6 +86,7 @@ local PLATE_W, PLATE_H = 160, 16
 local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
 local logCasts -- set below (combat-log casts by name)
 local faces, TakeFace, ReleaseFace -- NPC face cache (below)
+local IsPetName -- below
 local CAST_H, CAST_H_TARGET = 6, 7 -- the cast strip always sits under the health bar
 
 local function Classify(r, g, b)
@@ -114,6 +115,29 @@ ns:On("UNIT_PET", ScanPets)
 ns:On("PARTY_MEMBERS_CHANGED", ScanPets)
 ns:On("RAID_ROSTER_UPDATE", ScanPets)
 ns:On("PLAYER_ENTERING_WORLD", ScanPets)
+
+-- Pet names (enemy and friendly), learned from the pet unit tokens and from any player-controlled
+-- non-player unit you target / focus / mouse over. A name the game knows as a player never counts.
+local petNames = {}
+local PET_TOKENS = { "pet", "partypet1", "partypet2", "partypet3", "partypet4",
+	"arenapet1", "arenapet2", "arenapet3", "arenapet4", "arenapet5" }
+local SEEN_TOKENS = { "target", "focus", "mouseover", "targettarget", "focustarget" }
+function IsPetName(name)
+	if classByName[name] or ns.nameToGUID[name] then return false end
+	if petNames[name] then return true end
+	for _, u in ipairs(PET_TOKENS) do
+		if UnitExists(u) and UnitName(u) == name then petNames[name] = true return true end
+	end
+	for _, u in ipairs(SEEN_TOKENS) do
+		if UnitExists(u) and not UnitIsPlayer(u) and UnitPlayerControlled and UnitPlayerControlled(u)
+			and UnitName(u) == name then
+			petNames[name] = true
+			return true
+		end
+	end
+	return false
+end
+ns.IsPetName = IsPetName
 
 local function ArenaNumber(name)
 	if not name then return nil end
@@ -329,6 +353,7 @@ function TakeFace(d, name, unit)
 	pick:SetAllPoints(d.classIcon.tex)
 	pick:SetFrameLevel(d.classIcon:GetFrameLevel() + 1)
 	pick:Show()
+	d.classIcon.tex:SetTexture(nil) -- nothing left showing under the face
 	return true
 end
 
@@ -467,11 +492,19 @@ local function UpdatePlate(plate, d)
 	local arena = (not friendly) and ArenaNumber(name)
 	local unit = name and PlateUnit(name, isTarget, arena)
 
+	-- Pets: the game can color a pet's bar like its owner's class (a hunter's pet looks like a
+	-- hunter), so a known pet name is never a player: no class icon, its own face instead
+	local isPet = name and kind ~= "friendlyPlayer" and IsPetName(name)
+	if isPet then
+		class = nil
+		if not friendly then kind = "enemyPet" end
+	end
+
 	-- Class: ask the game directly whenever we can, the bar color is only a fallback
 	-- (it only carries class when the class-color nameplate setting is active).
 	-- Friendly players: their bar is plain blue (no class), so look them up the same way:
 	-- your target / party / raid by name, else any player the combat log has seen.
-	do
+	if not isPet then
 		local u = isTarget and "target" or (arena and ("arena" .. arena)) or (friendly and unit) or nil
 		if friendly and not u and name and kind == "friendlyPlayer" and GetNumRaidMembers then
 			for i = 1, GetNumRaidMembers() do
@@ -502,6 +535,8 @@ local function UpdatePlate(plate, d)
 		d.hp:SetStatusBarColor(colors.channel[1], colors.channel[2], colors.channel[3]) -- friendly pets: blue
 	elseif friendly then
 		d.hp:SetStatusBarColor(colors.friendly[1], colors.friendly[2], colors.friendly[3])
+	elseif kind == "enemyPet" then
+		d.hp:SetStatusBarColor(ns:Soften(colors.danger[1], colors.danger[2], colors.danger[3]))
 	elseif kind == "enemyPlayer" then
 		d.hp:SetStatusBarColor(ns:BarColor(class))
 	else
