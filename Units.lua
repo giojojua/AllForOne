@@ -571,6 +571,20 @@ local function ComboShown()
 	return class == "ROGUE" or class == "DRUID" or GetComboPoints("player", "target") > 0
 end
 
+-- hover a target buff / debuff: the normal Blizzard tooltip for it
+local function AuraEnter(icon)
+	if not icon.auraIndex then return end
+	GameTooltip:SetOwner(icon, "ANCHOR_BOTTOMRIGHT")
+	GameTooltip:SetUnitAura(icon.auraUnit or "target", icon.auraIndex, icon.auraFilter)
+	GameTooltip:Show()
+end
+local function AuraLeave() GameTooltip:Hide() end
+local function HoverAura(icon)
+	icon:EnableMouse(true)
+	icon:SetScript("OnEnter", AuraEnter)
+	icon:SetScript("OnLeave", AuraLeave)
+end
+
 function Target:UpdateAuras()
 	local debuffs, buffs = {}, {}
 	if ns.testing then
@@ -582,7 +596,7 @@ function Target:UpdateAuras()
 			if not name then break end
 			local mine = caster == "player" or caster == "pet"
 			if mine or ns.CC[name] then
-				debuffs[#debuffs + 1] = { icon = icon, count = count, dur = duration, expires = expires, cc = ns.CC[name] and true, mine = mine }
+				debuffs[#debuffs + 1] = { icon = icon, count = count, dur = duration, expires = expires, cc = ns.CC[name] and true, mine = mine, index = i }
 			end
 		end
 		-- every buff on the target; on enemies the ones you can purge / spellsteal come first (blue edge)
@@ -591,7 +605,7 @@ function Target:UpdateAuras()
 			local name, _, icon, count, dispel, duration, expires, _, stealable = UnitAura("target", i, "HELPFUL")
 			if not name then break end
 			local purge = enemy and (stealable or dispel == "Magic") and true or false
-			buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = (expires and expires > 0) and expires or nil, purge = purge }
+			buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = (expires and expires > 0) and expires or nil, purge = purge, index = i }
 		end
 		table.sort(buffs, function(a, b)
 			if a.purge ~= b.purge then return a.purge end
@@ -606,6 +620,7 @@ function Target:UpdateAuras()
 	local maxDebuffs = #self.debuffs
 	for i, icon in ipairs(self.debuffs) do
 		local a = i <= maxDebuffs and debuffs[i] or nil
+		icon.auraIndex, icon.auraFilter = a and a.index, "HARMFUL"
 		if a then
 			icon:Set(a.icon, a.count, a.dur, a.expires)
 			if a.cc and not a.mine then icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3]) else icon:SetBorder() end
@@ -615,6 +630,7 @@ function Target:UpdateAuras()
 	end
 	for i, icon in ipairs(self.buffs) do
 		local a = buffs[i]
+		icon.auraIndex, icon.auraFilter = a and a.index, "HELPFUL"
 		if a then
 			icon:Set(a.icon, a.count, a.dur, a.expires)
 			if a.purge then
@@ -690,6 +706,7 @@ local function CreateTarget(holder)
 		local icon = ns:CreateIcon(f, 20, 10)
 		local col, row = (i - 1) % 8, floor((i - 1) / 8)
 		icon:SetPoint("TOPLEFT", f.castbar, "BOTTOMLEFT", col * 23, -4 - row * 23)
+		HoverAura(icon)
 		f.buffs[i] = icon
 	end
 
@@ -697,6 +714,7 @@ local function CreateTarget(holder)
 	for i = 1, 8 do
 		local icon = ns:CreateIcon(f, 28, 12)
 		icon:SetPoint("BOTTOMLEFT", f.health, "TOPLEFT", (i - 1) * 32, 8)
+		HoverAura(icon)
 		f.debuffs[i] = icon
 	end
 
