@@ -85,6 +85,7 @@ end
 local PLATE_W, PLATE_H = 160, 16
 local PLATE_W_TARGET, PLATE_H_TARGET = 180, 19
 local logCasts -- set below (combat-log casts by name)
+local faces, TakeFace, ReleaseFace -- NPC face cache (below)
 local CAST_H, CAST_H_TARGET = 6, 7 -- the cast strip always sits under the health bar
 
 local function Classify(r, g, b)
@@ -229,6 +230,8 @@ local function Setup(plate)
 	raidIcon:SetSize(20, 20)
 
 	health:HookScript("OnValueChanged", function() if d.update then d.update() end end)
+	-- plate goes away (out of range / recycled): give its NPC face back to the cache
+	plate:HookScript("OnHide", function() ReleaseFace(d) end)
 	plates[plate] = d
 	return d
 end
@@ -263,6 +266,70 @@ local function PlateUnit(name, isTarget, arena)
 	for _, u in ipairs({ "focus", "mouseover", "party1", "party2", "party3", "party4" }) do
 		if UnitExists(u) and UnitName(u) == name then return u end
 	end
+end
+
+-- NPC face cache. The game can only draw a portrait from a live unit, and a drawn portrait
+-- can't be copied, so every face we draw is kept in its own little frame, filed by NPC name.
+-- A plate borrows a free one for its NPC (no mouseover needed again); while a unit for that
+-- NPC is around we draw extra copies, so several same-named NPCs can all show it.
+-- (Kept until /reload or logout: the game can't save pictures.)
+faces = {}          -- npc name -> { frame, ... }
+ns.npcFaces = faces
+local faceCount = 0
+local FACE_LIMIT, FACE_PER_NAME = 400, 8
+local faceHolder = CreateFrame("Frame")
+faceHolder:Hide()
+local function NewFace(name, unit)
+	local list = faces[name] or {}
+	if #list >= FACE_PER_NAME then return nil end
+	if faceCount >= FACE_LIMIT then
+		-- full: forget faces nobody is using
+		for n, l in pairs(faces) do
+			for i = #l, 1, -1 do
+				if not l[i].owner then table.remove(l, i); faceCount = faceCount - 1 end
+			end
+			if #l == 0 then faces[n] = nil end
+		end
+		if faceCount >= FACE_LIMIT then return nil end
+		list = faces[name] or {}
+	end
+	local f = CreateFrame("Frame", nil, faceHolder)
+	f.tex = f:CreateTexture(nil, "ARTWORK")
+	f.tex:SetAllPoints(f)
+	SetPortraitTexture(f.tex, unit)
+	f.tex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
+	f.name = name
+	list[#list + 1] = f
+	faces[name] = list
+	faceCount = faceCount + 1
+	return f
+end
+function ReleaseFace(d)
+	local f = d.face
+	if not f then return end
+	d.face, f.owner = nil, nil
+	f:Hide()
+	f:SetParent(faceHolder)
+	f:ClearAllPoints()
+end
+-- give this plate a face for `name`: keep the one it has, borrow a free cached one, or draw a
+-- new one from `unit` if we have it
+function TakeFace(d, name, unit)
+	if d.face and d.face.name == name then return true end
+	ReleaseFace(d)
+	local pick
+	for _, f in ipairs(faces[name] or {}) do
+		if not f.owner then pick = f break end
+	end
+	if not pick and unit and SetPortraitTexture then pick = NewFace(name, unit) end
+	if not pick then return false end
+	pick.owner, d.face = d, pick
+	pick:SetParent(d.classIcon)
+	pick:ClearAllPoints()
+	pick:SetAllPoints(d.classIcon.tex)
+	pick:SetFrameLevel(d.classIcon:GetFrameLevel() + 1)
+	pick:Show()
+	return true
 end
 
 -- Any unit token that is this NPC right now (for its portrait). Same-named NPCs share a face.
@@ -344,7 +411,7 @@ end
 
 local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.isTotem = true
-	d.portraitFor = nil
+	ReleaseFace(d)
 	d.hp:SetSize(PLATE_W / 2, 8) -- totems: half-size plate
 	d.track:Hide()
 	if friendly then
@@ -456,29 +523,22 @@ local function UpdatePlate(plate, d)
 		coords = c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
 	end
 	if coords then
-		d.portraitFor = nil
+		ReleaseFace(d)
 		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 		d.classIcon:Show()
 	else
 		-- NPCs and pets (enemy and friendly): their real face, the same portrait Blizzard's
-		-- frames show. The game only draws it from a unit, so it appears once any unit we can
-		-- see is that NPC (target, mouseover, focus, their targets, party targets, pets) and
-		-- then stays on the plate. Until then: the creature-type icon (enemies) / no icon (friends).
+		-- frames show. Drawn the first time any unit we can see is that NPC (target, mouseover,
+		-- focus, their targets, party targets, pets), then cached by name for every plate of that
+		-- NPC. Never seen yet: the creature-type icon (enemies) / no icon (friends).
 		local tex = d.classIcon.tex
 		local pu = name and kind ~= "friendlyPlayer" and NpcUnit(name, unit)
-		if pu then
-			npcIcons[name] = ns:CreatureIcon(pu)
-			if SetPortraitTexture and d.portraitFor ~= name then
-				SetPortraitTexture(tex, pu)
-				tex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
-				d.portraitFor = name
-			end
-		end
-		if name and d.portraitFor == name then
+		if pu then npcIcons[name] = ns:CreatureIcon(pu) end
+		if name and kind ~= "friendlyPlayer" and TakeFace(d, name, pu) then
 			d.classIcon:Show()
 		else
-			d.portraitFor = nil
+			ReleaseFace(d)
 			if friendly then
 				d.classIcon:Hide()
 			else
@@ -632,11 +692,10 @@ ns:Listen("LOGIN", function()
 	scanner:Show()
 end)
 
--- NPC faces can load a moment late: redo the portrait on plates showing that unit
+-- NPC faces can load a moment late: redraw the cached faces of that NPC
 ns:On("UNIT_PORTRAIT_UPDATE", function(_, unit)
-	local name = unit and UnitExists(unit) and UnitName(unit)
-	if not name then return end
-	for _, d in pairs(plates) do
-		if d.portraitFor == name then d.portraitFor = false end
-	end
+	local name = unit and UnitExists(unit) and not UnitIsPlayer(unit) and UnitName(unit)
+	local list = name and faces[name]
+	if not list or not SetPortraitTexture then return end
+	for _, f in ipairs(list) do SetPortraitTexture(f.tex, unit) end
 end)
