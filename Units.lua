@@ -36,6 +36,17 @@ function U.Faction(u)
 	end
 	return UnitFactionGroup(u)
 end
+-- NPCs and pets: their real face (the game renders a portrait of the unit), cropped square
+function U.PaintPortrait(tex, u)
+	if not fake(u) and SetPortraitTexture and UnitExists(u) then
+		SetPortraitTexture(tex, u)
+		tex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
+	else
+		tex:SetTexture(U.CreatureIcon(u))
+		tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+end
+
 function U.CreatureIcon(u)
 	local f = fake(u)
 	if f and f.creature then return ns.creatureIcons[f.creature] or ns.creatureFallback end
@@ -191,8 +202,7 @@ local function PaintClassIcon(icon, unit)
 		icon.tex:SetTexture(CLASS_TEX)
 		icon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 	else
-		icon.tex:SetTexture(ns:CreatureIcon(unit))
-		icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		U.PaintPortrait(icon.tex, unit)
 	end
 	icon:Show()
 end
@@ -336,7 +346,7 @@ function Row:UpdatePet()
 	local r, g, b = ns:ClassColor(U.Class(self.unit))
 	p.bar:SetStatusBarColor(r * 0.75, g * 0.75, b * 0.75)
 	p.name:SetText(U.Name(u) or "")
-	p.icon.tex:SetTexture(U.CreatureIcon(u))
+	U.PaintPortrait(p.icon.tex, u)
 	p.hp:SetText(floor((cur or 0) / max * 100 + 0.5) .. "%")
 end
 
@@ -890,6 +900,8 @@ ns:On("UNIT_COMBO_POINTS", function()
 end)
 ns:On("PARTY_MEMBERS_CHANGED", function() ns:RefreshAll() end)
 ns:On("ARENA_OPPONENT_UPDATE", function(_, unit) if unit then ForUnit(unit, "Update") end end)
+-- NPC faces load a moment after the unit appears: repaint when the game says it's ready
+ns:On("UNIT_PORTRAIT_UPDATE", function(_, unit) if unit then ForUnit(unit, "Update") end end)
 
 local function RefreshGUID(guid, method)
 	for _, f in ipairs(frames) do

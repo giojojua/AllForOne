@@ -333,6 +333,7 @@ end
 
 local function UpdateTotem(d, icon, friendly, r, g, b)
 	d.isTotem = true
+	d.portraitFor = nil
 	d.hp:SetSize(PLATE_W / 2, 8) -- totems: half-size plate
 	d.track:Hide()
 	if friendly then
@@ -444,16 +445,29 @@ local function UpdatePlate(plate, d)
 		coords = c and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
 	end
 	if coords then
+		d.portraitFor = nil
 		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 	elseif friendly then
 		-- friendly NPCs (vendors, guards...) and players whose class we don't know yet: no icon
 		d.classIcon:Hide()
 	else
-		-- NPCs: learn the creature type when you target/mouse over one, then reuse it by name
-		if unit and not UnitIsPlayer(unit) and name then npcIcons[name] = ns:CreatureIcon(unit) end
-		d.classIcon.tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
-		d.classIcon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		-- NPCs: their real face once you target / mouse over / focus them (the portrait stays on
+		-- the plate after that); until then the creature-type icon learned for that name
+		local tex = d.classIcon.tex
+		if unit and not UnitIsPlayer(unit) and name then
+			npcIcons[name] = ns:CreatureIcon(unit)
+			if SetPortraitTexture and d.portraitFor ~= name then
+				SetPortraitTexture(tex, unit)
+				tex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
+				d.portraitFor = name
+			end
+		end
+		if not name or d.portraitFor ~= name then
+			d.portraitFor = nil
+			tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
+			tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		end
 	end
 	if coords or not friendly then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
@@ -598,4 +612,13 @@ ns:Listen("LOGIN", function()
 	-- enemy totems get (small) plates too
 	pcall(SetCVar, "nameplateShowEnemyTotems", "1")
 	scanner:Show()
+end)
+
+-- NPC faces can load a moment late: redo the portrait on plates showing that unit
+ns:On("UNIT_PORTRAIT_UPDATE", function(_, unit)
+	local name = unit and UnitExists(unit) and UnitName(unit)
+	if not name then return end
+	for _, d in pairs(plates) do
+		if d.portraitFor == name then d.portraitFor = false end
+	end
 end)
