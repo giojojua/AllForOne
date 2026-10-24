@@ -265,6 +265,17 @@ local function PlateUnit(name, isTarget, arena)
 	end
 end
 
+-- Any unit token that is this NPC right now (for its portrait). Same-named NPCs share a face.
+local NPC_TOKENS = { "target", "mouseover", "focus", "targettarget", "focustarget", "pet", "pettarget",
+	"party1target", "party2target", "party3target", "party4target", "partypet1", "partypet2", "partypet3",
+	"partypet4", "arenapet1", "arenapet2", "arenapet3", "arenapet4", "arenapet5" }
+local function NpcUnit(name, unit)
+	if unit and UnitExists(unit) and not UnitIsPlayer(unit) then return unit end
+	for _, u in ipairs(NPC_TOKENS) do
+		if UnitExists(u) and not UnitIsPlayer(u) and UnitName(u) == name then return u end
+	end
+end
+
 local function LayoutAuras(d, anchorTop, friendly, guid, unit)
 	local best, mine
 	if unit then
@@ -448,28 +459,35 @@ local function UpdatePlate(plate, d)
 		d.portraitFor = nil
 		d.classIcon.tex:SetTexture("Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes")
 		d.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
-	elseif friendly then
-		-- friendly NPCs (vendors, guards...) and players whose class we don't know yet: no icon
-		d.classIcon:Hide()
+		d.classIcon:Show()
 	else
-		-- NPCs: their real face once you target / mouse over / focus them (the portrait stays on
-		-- the plate after that); until then the creature-type icon learned for that name
+		-- NPCs and pets (enemy and friendly): their real face, the same portrait Blizzard's
+		-- frames show. The game only draws it from a unit, so it appears once any unit we can
+		-- see is that NPC (target, mouseover, focus, their targets, party targets, pets) and
+		-- then stays on the plate. Until then: the creature-type icon (enemies) / no icon (friends).
 		local tex = d.classIcon.tex
-		if unit and not UnitIsPlayer(unit) and name then
-			npcIcons[name] = ns:CreatureIcon(unit)
+		local pu = name and kind ~= "friendlyPlayer" and NpcUnit(name, unit)
+		if pu then
+			npcIcons[name] = ns:CreatureIcon(pu)
 			if SetPortraitTexture and d.portraitFor ~= name then
-				SetPortraitTexture(tex, unit)
+				SetPortraitTexture(tex, pu)
 				tex:SetTexCoord(0.15, 0.85, 0.15, 0.85)
 				d.portraitFor = name
 			end
 		end
-		if not name or d.portraitFor ~= name then
+		if name and d.portraitFor == name then
+			d.classIcon:Show()
+		else
 			d.portraitFor = nil
-			tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
-			tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			if friendly then
+				d.classIcon:Hide()
+			else
+				tex:SetTexture((name and npcIcons[name]) or ns.creatureFallback)
+				tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+				d.classIcon:Show()
+			end
 		end
 	end
-	if coords or not friendly then d.classIcon:Show() end
 	local min, max = d.health:GetMinMaxValues()
 	d.hp:SetMinMaxValues(min, max)
 	d.hp:SetValue(d.health:GetValue())
