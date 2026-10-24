@@ -235,7 +235,11 @@ local function RefreshUnits()
 	for i = 1, 5 do
 		local u = "arena" .. i
 		local g = UnitGUID(u)
-		if g and M then
+		-- only after the gates open: before that the arena tokens can still point at the
+		-- previous match's enemies. Skip "Unknown" until the server sends the real unit.
+		local uname = g and UnitName(u)
+		if uname == UNKNOWNOBJECT or uname == UNKNOWN then uname = nil end
+		if g and M and M.start and uname then
 			local e = M.enemyByGUID[g]
 			if not e then
 				e = { guid = g, unit = u, name = ns:FullName(u) or u, class = select(2, UnitClass(u)), n = i,
@@ -244,7 +248,7 @@ local function RefreshUnits()
 				M.enemies[#M.enemies + 1] = e
 			end
 			e.unit = u
-			e.class = e.class or select(2, UnitClass(u))
+			e.class = select(2, UnitClass(u)) or e.class
 			e.spec = ns.specs[g] or e.spec
 			enemies[g] = e
 		end
@@ -362,9 +366,57 @@ end
 local function GatesOpen()
 	if M and not M.start then
 		M.start = Now()
+		M.mySpec = MySpec() -- dual spec may have been switched in the starting room
 		Timeline("Gates open")
 		-- ask for the scoreboard now, so it's there to tell the teams apart at the end
 		if RequestBattlefieldScoreData then RequestBattlefieldScoreData() end
+	end
+end
+
+-- The scoreboard is the truth about who played and their classes: fix classes, drop anyone
+-- who wasn't in this match (stale arena units), add enemies we never saw
+local function Short(n) return n and n:match("^[^-]+") end
+local function CheckRoster(m)
+	if not (GetNumBattlefieldScores and GetBattlefieldScore) then return end
+	local rows, myTeam = {}, nil
+	local me = UnitName("player")
+	for i = 1, GetNumBattlefieldScores() or 0 do
+		local name, _, _, _, _, team, _, _, _, token = GetBattlefieldScore(i)
+		if name then
+			rows[#rows + 1] = { name = name, short = Short(name), team = team, class = token }
+			if Short(name) == me then myTeam = team end
+		end
+	end
+	if #rows == 0 or myTeam == nil then return end
+	local ours, theirs = {}, {}
+	for _, r in ipairs(rows) do
+		if r.team == myTeam then ours[r.short] = r else theirs[r.short] = r end
+	end
+	-- enemies
+	local keep, have = {}, {}
+	for _, e in ipairs(m.enemies) do
+		local r = theirs[Short(e.name)]
+		if r then
+			e.class = r.class or e.class
+			keep[#keep + 1] = e
+			have[r.short] = true
+		end
+	end
+	for short, r in pairs(theirs) do
+		if not have[short] then
+			keep[#keep + 1] = { name = r.name, class = r.class, n = #keep + 1, trinkets = 0, trinketEarly = 0,
+				defUsed = {}, defEarly = 0, ccTime = 0, interrupted = 0, dmgTaken = 0 }
+		end
+	end
+	m.enemies = keep
+	-- our team
+	for g, t in pairs(m.teamSeen) do
+		local r = ours[Short(t.name)]
+		if r then
+			t.class = r.class or t.class
+		elseif next(ours) then
+			m.teamSeen[g] = nil
+		end
 	end
 end
 
@@ -383,6 +435,7 @@ local function Finish(result)
 		m.cc.onMeTime = m.cc.onMeTime + d
 		Count(m.cc.onMe, o.cat, d)
 	end
+	CheckRoster(m)
 	-- our team
 	for g, t in pairs(m.teamSeen) do
 		m.teamInfo[#m.teamInfo + 1] = { name = t.name, class = t.class, spec = t.spec or ns.specs[g], order = t.order }
