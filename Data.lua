@@ -236,6 +236,22 @@ ns.trinketCooldown = 120
 ----------------------------------------------------------------------
 -- (talent-only casts, talent buffs / procs / forms, and talent pets; any event from the
 -- player or their pet counts: casts, damage, heals, auras, summons)
+-- Talents low enough in a tree that other specs often pick them up too (hybrid PvP builds:
+-- Soul Link on Affliction, Preparation on Assassination, Readiness on Survival...). They only
+-- name a spec when nothing better is known yet, and any other signature replaces them.
+local weakSpec = {
+	19028, 47193, 18223, 17877, 34936,  -- Soul Link, Demonic Empowerment, Curse of Exhaustion, Shadowburn, Backlash
+	14751, 15286, 15407, 15487,         -- Inner Focus, Vampiric Embrace, Mind Flay, Silence
+	20216, 20375, 64205,                -- Divine Favor, Seal of Command, Divine Sacrifice
+	12043, 11958, 12472, 11113, 64343, 31589, -- Presence of Mind, Cold Snap, Icy Veins, Blast Wave, Impact, Slow
+	17116, 5570,                        -- Nature's Swiftness, Insect Swarm
+	16166, 51886,                       -- Elemental Mastery, Cleanse Spirit
+	14177, 14185, 14183, 14278, 14251, 13877, 16511, -- Cold Blood, Preparation, Premeditation, Ghostly Strike, Riposte, Blade Flurry, Hemorrhage
+	12328, 12292, 12809,                -- Sweeping Strikes, Death Wish, Concussion Blow
+	19577, 23989,                       -- Intimidation, Readiness
+	49005, 49016, 49158,                -- Mark of Blood, Hysteria, Corpse Explosion
+}
+
 local specList = {
 	WARRIOR = {
 		Arms = { 47486, 12294, 46924, 12328, 46857, 52437, 60503 },          -- Mortal Strike, Bladestorm, Sweeping Strikes, Trauma, Sudden Death, Taste for Blood
@@ -379,7 +395,11 @@ ns:Listen("LOGIN", function()
 		if name then ns.Racial[name] = { name = name, icon = icon, cd = e[2] } end
 	end
 	-- a name that points at two different specs tells us nothing: drop it
-	local clash = {}
+	local clash, weakNames = {}, {}
+	for _, id in ipairs(weakSpec) do
+		local name = Info(id)
+		if name then weakNames[name] = true end
+	end
 	for class, specs in pairs(specList) do
 		for spec, ids in pairs(specs) do
 			for _, id in ipairs(ids) do
@@ -387,7 +407,7 @@ ns:Listen("LOGIN", function()
 				if name then
 					local had = ns.Spec[name]
 					if had and (had.class ~= class or had.spec ~= spec) then clash[name] = true end
-					ns.Spec[name] = { class = class, spec = spec }
+					ns.Spec[name] = { class = class, spec = spec, weak = weakNames[name] }
 				end
 			end
 		end

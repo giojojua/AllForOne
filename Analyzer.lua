@@ -28,6 +28,17 @@ local CHECKED_CC = {
 	118, 28271, 28272, 61305, 61721, 61780, 51724, 1776, 51514, 20066, 49012, -- Polymorph (all), Sap, Gouge, Hex, Repentance, Wyvern Sting
 	18658, 19503, 6215, 6358, 2094, 10326, 47860, 64044, 33786, 18647, 605, -- Hibernate, Scatter Shot, Fear, Seduction, Blind, Turn Evil, Death Coil, Psychic Horror, Cyclone, Banish, Mind Control
 }
+-- Slows / snares are never a crowd-control mistake, even when the target is immune to them
+-- (Hand of Freedom, Bladestorm, a snare "diminished" to immune...). Deep Freeze on a stun-immune
+-- target is on purpose too: it does its damage instead.
+local SNARES = {
+	1715, 2974, 3409, 120, 45524, 5116, 31589, 8056, 3600, 15407, 18223, 48484, 12323, 11113, 116,
+	44614, 55741, 1604, 26679, 31935, 20184, 6343, 50516, 2484, 13810, 58180, 12486, 7321, 6136,
+} -- Hamstring, Wing Clip, Crippling Poison, Cone of Cold, Chains of Ice, Concussive Shot, Slow, Frost Shock,
+  -- Earthbind, Mind Flay, Curse of Exhaustion, Infected Wounds, Piercing Howl, Blast Wave, Frostbolt,
+  -- Frostfire Bolt, Desecration, Dazed, Deadly Throw, Avenger's Shield, Judgement of Justice, Thunder Clap,
+  -- Typhoon, Earthbind Totem, Frost Trap Aura, Infected Wounds (glyph), Chilled (Blizzard), Chilled (Frost Armor)
+local IMMUNE_OK = { 44572 } -- Deep Freeze
 local SILENCE_TALENTS = { 11255, 13754, 12311 } -- Improved Counterspell, Improved Kick, Gag Order
 local ENEMY_KICKS = {
 	ROGUE = { 1766 }, WARRIOR = { 6552, 72 }, MAGE = { 2139 }, SHAMAN = { 57994 },
@@ -74,6 +85,9 @@ local function BuildSets()
 	IS.grounding = Name(8177)
 	IS.checkCC = {}
 	for _, id in ipairs(CHECKED_CC) do IS.checkCC[Name(id)] = true end
+	IS.snare, IS.immuneOk = {}, {}
+	for _, id in ipairs(SNARES) do IS.snare[Name(id)] = true end
+	for _, id in ipairs(IMMUNE_OK) do IS.immuneOk[Name(id)] = true end
 	IS.kickSilence = {}
 	for _, id in ipairs(KICK_SILENCES) do IS.kickSilence[Name(id)] = true end
 end
@@ -649,8 +663,13 @@ local function OnMissed(src, dst, dstName, spell, missType)
 		if p then M.kicks.missed = M.kicks.missed + 1 end
 		return
 	end
+	if IS.snare[spell] then return end -- slows are never a mistake
 	if IS.checkCC[spell] then
-		if missType == "IMMUNE" then M.cc.immune = M.cc.immune + 1; M.cc.wasted = M.cc.wasted + 1
+		if missType == "IMMUNE" then
+			if IS.immuneOk[spell] then return end
+			M.cc.immune = M.cc.immune + 1; M.cc.wasted = M.cc.wasted + 1
+			M.cc.immuneSpells = M.cc.immuneSpells or {}
+			M.cc.immuneSpells[spell] = (M.cc.immuneSpells[spell] or 0) + 1
 		elseif missType == "REFLECT" then M.cc.reflected = M.cc.reflected + 1; M.cc.wasted = M.cc.wasted + 1 end
 	end
 end
@@ -937,7 +956,13 @@ function A:Analyze(m)
 	-- your crowd control
 	if m.cc.wasted >= 1 then
 		local parts = {}
-		if m.cc.immune > 0 then parts[#parts + 1] = m.cc.immune .. " immune (diminishing returns)" end
+		if m.cc.immune > 0 then
+			-- say which spells, so it's clear what hit an immunity
+			local list = {}
+			for sp, n in pairs(m.cc.immuneSpells or {}) do list[#list + 1] = (n > 1) and (sp .. " x" .. n) or sp end
+			table.sort(list)
+			parts[#parts + 1] = m.cc.immune .. " immune" .. (#list > 0 and (" (" .. table.concat(list, ", ") .. ")") or "")
+		end
 		if m.cc.reflected > 0 then parts[#parts + 1] = m.cc.reflected .. " reflected" end
 		if m.cc.grounded > 0 then parts[#parts + 1] = m.cc.grounded .. " grounded" end
 		Add("cc_wasted", format("%d of your crowd controls were wasted: %s", m.cc.wasted, table.concat(parts, ", ")), 2)
