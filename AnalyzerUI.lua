@@ -608,7 +608,7 @@ function A:Sample()
 			{ kind = "trinket_held", text = "Sat in Fear (8s) with your trinket ready while Lumen was at 21% (2:31)", w = 3 },
 			{ kind = "died_def", text = "You died with Ice Block ready", w = 3 },
 			{ kind = "kicked_ready", text = "You were interrupted 3 times; 2 were long casts started while their interrupt was ready - fake-cast first", w = 2 },
-			{ kind = "cc_wasted", text = "1 of your crowd controls were wasted: 1 immune (diminishing returns)", w = 2 },
+			{ kind = "cc_wasted", text = "1 of your crowd controls were wasted: 1 immune (Polymorph)", w = 2 },
 		},
 		deaths = {
 			{ name = "Lumen", class = "PRIEST", side = "us", t = 158, first = true,
