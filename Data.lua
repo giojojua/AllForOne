@@ -236,72 +236,59 @@ ns.trinketCooldown = 120
 ----------------------------------------------------------------------
 -- (talent-only casts, talent buffs / procs / forms, and talent pets; any event from the
 -- player or their pet counts: casts, damage, heals, auras, summons)
--- Talents low enough in a tree that other specs often pick them up too (hybrid PvP builds:
--- Soul Link on Affliction, Preparation on Assassination, Readiness on Survival...). They only
--- name a spec when nothing better is known yet, and any other signature replaces them.
-local weakSpec = {
-	19028, 47193, 18223, 17877, 34936,  -- Soul Link, Demonic Empowerment, Curse of Exhaustion, Shadowburn, Backlash
-	14751, 15286, 15407, 15487,         -- Inner Focus, Vampiric Embrace, Mind Flay, Silence
-	20216, 20375, 64205,                -- Divine Favor, Seal of Command, Divine Sacrifice
-	12043, 11958, 12472, 11113, 64343, 31589, -- Presence of Mind, Cold Snap, Icy Veins, Blast Wave, Impact, Slow
-	17116, 5570,                        -- Nature's Swiftness, Insect Swarm
-	16166, 51886,                       -- Elemental Mastery, Cleanse Spirit
-	14177, 14185, 14183, 14278, 14251, 13877, 16511, -- Cold Blood, Preparation, Premeditation, Ghostly Strike, Riposte, Blade Flurry, Hemorrhage
-	12328, 12292, 12809,                -- Sweeping Strikes, Death Wish, Concussion Blow
-	19577, 23989,                       -- Intimidation, Readiness
-	49005, 49016, 49158,                -- Mark of Blood, Hysteria, Corpse Explosion
-}
-
+-- Only deep talents (31 / 41 / 51-point talents and procs from the bottom of a tree): a hybrid
+-- build can't reach them, so seeing one means that tree has most of the points. Low talents that
+-- other specs often pick up (Soul Link, Preparation, Readiness...) are deliberately left out.
 local specList = {
 	WARRIOR = {
-		Arms = { 47486, 12294, 46924, 12328, 46857, 52437, 60503 },          -- Mortal Strike, Bladestorm, Sweeping Strikes, Trauma, Sudden Death, Taste for Blood
-		Fury = { 23881, 60970, 46916, 12292 },                              -- Bloodthirst, Heroic Fury, Bloodsurge, Death Wish
-		Protection = { 47498, 46968, 50720, 12809, 50227 },                 -- Devastate, Shockwave, Vigilance, Concussion Blow, Sword and Board
+		Arms = { 12294, 47486, 46924, 52437 },                    -- Mortal Strike, Bladestorm, Sudden Death
+		Fury = { 23881, 60970, 46916 },                           -- Bloodthirst, Heroic Fury, Bloodsurge
+		Protection = { 20243, 47498, 46968, 50720, 50227 },       -- Devastate, Shockwave, Vigilance, Sword and Board
 	},
 	PALADIN = {
-		Holy = { 48825, 20473, 53563, 31842, 20216, 31834, 54149, 31821 },  -- Holy Shock, Beacon, Divine Illumination, Divine Favor, Light's Grace, Infusion of Light, Aura Mastery
-		Retribution = { 35395, 53385, 20066, 59578, 20375 },                -- Crusader Strike, Divine Storm, Repentance, The Art of War, Seal of Command
-		Protection = { 53595, 48827, 31935, 20925, 64205 },                 -- Hammer of the Righteous, Avenger's Shield, Holy Shield, Divine Sacrifice
+		Holy = { 20473, 48825, 53563, 31842, 54149 },             -- Holy Shock, Beacon of Light, Divine Illumination, Infusion of Light
+		Retribution = { 35395, 53385, 20066, 59578 },             -- Crusader Strike, Divine Storm, Repentance, The Art of War
+		Protection = { 31935, 48827, 53595, 20925 },              -- Avenger's Shield, Hammer of the Righteous, Holy Shield
 	},
 	HUNTER = {
-		["Beast Mastery"] = { 19574, 19577, 34471 },                         -- Bestial Wrath, Intimidation, The Beast Within
-		Marksmanship = { 53209, 34490, 19506, 23989, 53220 },               -- Chimera Shot, Silencing Shot, Trueshot Aura, Readiness, Improved Steady Shot
-		Survival = { 60053, 53301, 49012, 19386, 3674, 19306, 56453 },      -- Explosive Shot, Wyvern Sting, Black Arrow, Counterattack, Lock and Load
+		["Beast Mastery"] = { 19574, 34471 },                     -- Bestial Wrath, The Beast Within
+		Marksmanship = { 53209, 34490, 19506, 53220 },            -- Chimera Shot, Silencing Shot, Trueshot Aura, Improved Steady Shot
+		Survival = { 53301, 60053, 19386, 49012, 3674, 56453 },   -- Explosive Shot, Wyvern Sting, Black Arrow, Lock and Load
 	},
 	ROGUE = {
-		Assassination = { 48666, 1329, 14177, 51662, 58426 },               -- Mutilate, Cold Blood, Hunger for Blood, Overkill
-		Combat = { 51690, 13750, 13877, 14251 },                            -- Killing Spree, Adrenaline Rush, Blade Flurry, Riposte
-		Subtlety = { 36554, 51713, 14183, 16511, 14185, 14278 },            -- Shadowstep, Shadow Dance, Premeditation, Hemorrhage, Preparation, Ghostly Strike
+		Assassination = { 1329, 48666, 51662, 58426 },            -- Mutilate, Hunger for Blood, Overkill
+		Combat = { 51690, 13750 },                                -- Killing Spree, Adrenaline Rush
+		Subtlety = { 51713, 36554 },                              -- Shadow Dance, Shadowstep
 	},
 	PRIEST = {
-		Discipline = { 53007, 47540, 33206, 10060, 47930, 59888, 14751, 47753 }, -- Penance, Pain Suppression, Power Infusion, Grace, Borrowed Time, Inner Focus, Divine Aegis
-		Holy = { 48089, 34861, 47788, 33151, 724, 63735, 34754 },           -- Circle of Healing, Guardian Spirit, Surge of Light, Lightwell, Serendipity, Holy Concentration
-		Shadow = { 15473, 48160, 34914, 47585, 64044, 15487, 15286, 15407 }, -- Shadowform, Vampiric Touch, Dispersion, Psychic Horror, Silence, Vampiric Embrace, Mind Flay
+		Discipline = { 47540, 53007, 33206, 10060, 59888, 47753, 47930 }, -- Penance, Pain Suppression, Power Infusion, Borrowed Time, Divine Aegis, Grace
+		Holy = { 47788, 34861, 48089, 724, 63735, 34754 },        -- Guardian Spirit, Circle of Healing, Lightwell, Serendipity, Holy Concentration
+		Shadow = { 15473, 34914, 48160, 47585, 64044 },           -- Shadowform, Vampiric Touch, Dispersion, Psychic Horror
 	},
 	DRUID = {
-		Restoration = { 18562, 53251, 48438, 17116, 33891, 34123 },         -- Swiftmend, Wild Growth, Nature's Swiftness, Tree of Life (form + aura)
-		Feral = { 48566, 33876, 48564, 33878, 50334, 49376, 16979, 24932, 69369 }, -- Mangle, Berserk, Feral Charge, Leader of the Pack, Predator's Swiftness
-		Balance = { 53201, 48505, 24858, 24907, 61384, 50516, 5570, 33831 }, -- Starfall, Moonkin Form / Aura, Typhoon, Insect Swarm, Force of Nature
+		Restoration = { 18562, 33891, 34123, 48438, 53251 },      -- Swiftmend, Tree of Life (form + aura), Wild Growth
+		Feral = { 33876, 33878, 48566, 48564, 50334, 24932, 69369 }, -- Mangle, Berserk, Leader of the Pack, Predator's Swiftness
+		Balance = { 24858, 24907, 48505, 53201, 50516, 61384, 33831 }, -- Moonkin Form / Aura, Starfall, Typhoon, Force of Nature
 	},
 	SHAMAN = {
-		Restoration = { 49284, 974, 61301, 61295, 16190, 53390, 51886 },    -- Earth Shield, Riptide, Mana Tide, Tidal Waves, Cleanse Spirit
-		Enhancement = { 17364, 51533, 60103, 30823, 53817 },                -- Stormstrike, Feral Spirit, Lava Lash, Shamanistic Rage, Maelstrom Weapon
-		Elemental = { 59159, 51490, 16166, 57722, 30706 },                  -- Thunderstorm, Elemental Mastery, Totem of Wrath
+		Restoration = { 974, 49284, 61295, 61301, 16190, 53390 }, -- Earth Shield, Riptide, Mana Tide, Tidal Waves
+		Enhancement = { 17364, 51533, 60103, 30823, 53817 },      -- Stormstrike, Feral Spirit, Lava Lash, Shamanistic Rage, Maelstrom Weapon
+		Elemental = { 51490, 59159, 30706, 57722 },               -- Thunderstorm, Totem of Wrath
 	},
 	MAGE = {
-		Arcane = { 44781, 44425, 12042, 12043, 44401, 31589 },              -- Arcane Barrage, Arcane Power, Presence of Mind, Missile Barrage, Slow
-		Fire = { 55360, 44457, 42950, 31661, 11129, 48108, 11113, 64343, 54741 }, -- Living Bomb, Dragon's Breath, Combustion, Hot Streak, Blast Wave, Impact, Firestarter
-		Frost = { 44572, 43039, 11426, 31687, 44544, 57761, 11958, 12472 }, -- Deep Freeze, Ice Barrier, Water Elemental, Fingers of Frost, Brain Freeze, Cold Snap, Icy Veins
+		Arcane = { 44425, 44781, 12042, 44401 },                  -- Arcane Barrage, Arcane Power, Missile Barrage
+		Fire = { 44457, 55360, 31661, 42950, 11129, 48108, 54741 }, -- Living Bomb, Dragon's Breath, Combustion, Hot Streak, Firestarter
+		Frost = { 44572, 11426, 43039, 31687, 44544, 57761 },     -- Deep Freeze, Ice Barrier, Water Elemental, Fingers of Frost, Brain Freeze
 	},
 	WARLOCK = {
-		Affliction = { 59164, 48181, 47843, 30108, 31117, 18223 },          -- Haunt, Unstable Affliction (+ silence), Curse of Exhaustion
-		Demonology = { 47241, 30146, 47193, 71165, 63167, 19028 },          -- Metamorphosis, Felguard, Demonic Empowerment, Molten Core, Decimation, Soul Link
-		Destruction = { 59172, 50796, 47847, 30283, 17962, 54277, 34936, 17877 }, -- Chaos Bolt, Shadowfury, Conflagrate, Backdraft, Backlash, Shadowburn
+		Affliction = { 48181, 59164, 30108, 47843, 31117, 64371 }, -- Haunt, Unstable Affliction (+ silence), Eradication
+		Demonology = { 47241, 30146, 71165, 63167 },              -- Metamorphosis, Felguard, Molten Core, Decimation
+		Destruction = { 50796, 59172, 30283, 47847, 17962, 54277, 47283 }, -- Chaos Bolt, Shadowfury, Conflagrate, Backdraft, Empowered Imp
 	},
 	DEATHKNIGHT = {
-		Blood = { 55262, 55050, 49016, 49028, 55233, 49005 },               -- Heart Strike, Hysteria, Dancing Rune Weapon, Vampiric Blood, Mark of Blood
-		Frost = { 51411, 49184, 49203, 55268, 49143, 51124, 59052 },        -- Howling Blast, Hungering Cold, Frost Strike, Killing Machine, Freezing Fog
-		Unholy = { 55271, 55090, 49206, 49222, 51052, 63560, 49194, 49158 }, -- Scourge Strike, Gargoyle, Bone Shield, Anti-Magic Zone, Ghoul Frenzy, Unholy Blight, Corpse Explosion
+		Blood = { 55050, 55262, 49028 },                          -- Heart Strike, Dancing Rune Weapon
+		Frost = { 49184, 51411, 49203, 49143, 55268 },            -- Howling Blast, Hungering Cold, Frost Strike
+		Unholy = { 55090, 55271, 49206, 51052, 63560 },           -- Scourge Strike, Gargoyle, Anti-Magic Zone, Ghoul Frenzy
 	},
 }
 
@@ -395,11 +382,7 @@ ns:Listen("LOGIN", function()
 		if name then ns.Racial[name] = { name = name, icon = icon, cd = e[2] } end
 	end
 	-- a name that points at two different specs tells us nothing: drop it
-	local clash, weakNames = {}, {}
-	for _, id in ipairs(weakSpec) do
-		local name = Info(id)
-		if name then weakNames[name] = true end
-	end
+	local clash = {}
 	for class, specs in pairs(specList) do
 		for spec, ids in pairs(specs) do
 			for _, id in ipairs(ids) do
@@ -407,7 +390,7 @@ ns:Listen("LOGIN", function()
 				if name then
 					local had = ns.Spec[name]
 					if had and (had.class ~= class or had.spec ~= spec) then clash[name] = true end
-					ns.Spec[name] = { class = class, spec = spec, weak = weakNames[name] }
+					ns.Spec[name] = { class = class, spec = spec }
 				end
 			end
 		end
