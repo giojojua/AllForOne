@@ -6,6 +6,7 @@ local PLAYER_FLAG = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
 ns.unitOf = {}     -- guid -> unit token (pets map to their owner)
 ns.specs = {}      -- guid -> spec name
 ns.specSure = {}   -- guid -> true when the spec came from a deep-talent signature
+ns.specWhy = {}    -- guid -> the spell that decided it (/afo spec shows it)
 ns.cds = {}        -- guid -> { [spellName] = { start, dur, icon } }
 ns.trinkets = {}   -- guid -> time the PvP trinket was used
 ns.dr = {}         -- guid -> { [category] = { count, reset, icon, active } }
@@ -210,15 +211,13 @@ function ns:NoteSpec(guid, class, spellName)
 	if not spec then return end
 	if not class and GetPlayerInfoByGUID then class = select(2, GetPlayerInfoByGUID(guid)) end
 	if spec.class ~= class then return end
-	local cur = ns.specs[guid]
-	if cur == spec.spec then
-		if not spec.weak then ns.specSure[guid] = true end
-		return
-	end
-	-- a hybrid-friendly talent never replaces a spec we already know
-	if spec.weak and cur then return end
+	-- hybrid-friendly talents (Soul Link, Preparation, Readiness...) are taken by other specs
+	-- too, so they never name a spec: a wrong spec is worse than "no spec yet"
+	if spec.weak then return end
+	ns.specSure[guid] = true
+	if ns.specs[guid] == spec.spec then return end
 	ns.specs[guid] = spec.spec
-	ns.specSure[guid] = not spec.weak
+	ns.specWhy[guid] = spellName
 	ns:Send("SPEC", guid)
 end
 
@@ -388,7 +387,7 @@ end
 ns:On("PLAYER_ENTERING_WORLD", function()
 	wipe(ns.cds); wipe(ns.trinkets); wipe(ns.dr); wipe(ns.auras); wipe(ns.cdOrder)
 	local mine = ns.specs[UnitGUID("player") or ""]
-	wipe(ns.specs); wipe(ns.specSure)
+	wipe(ns.specs); wipe(ns.specSure); wipe(ns.specWhy)
 	ns:UpdateUnitMap()
 	UpdatePlayerSpec()
 	if mine and not ns.specs[UnitGUID("player")] then ns.specs[UnitGUID("player")] = mine end

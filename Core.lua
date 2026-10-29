@@ -323,6 +323,21 @@ SLASH_ALLFORONE2 = "/allforone"
 SlashCmdList.ALLFORONE = function(msg)
 	local raw = strtrim(msg or "")
 	local first, rawArg = strsplit(" ", raw, 2)
+	if strlower(first or "") == "spec" then
+		-- which spec each enemy / teammate got, and the spell that decided it
+		local any
+		for _, u in ipairs({ "target", "focus", "arena1", "arena2", "arena3", "arena4", "arena5", "party1", "party2", "party3", "party4" }) do
+			local g = UnitExists(u) and UnitIsPlayer(u) and UnitGUID(u)
+			if g then
+				any = true
+				local _, class = UnitClass(u)
+				ns:Print(format("%s: %s %s - %s", u, UnitName(u) or "?", class or "?",
+					ns.specs[g] and (ns.specs[g] .. " (from " .. (ns.specWhy[g] or "talents") .. ")") or "no spec yet"))
+			end
+		end
+		if not any then ns:Print("target a player (or be in an arena / party) to see their spec") end
+		return
+	end
 	if strlower(first or "") == "quests" then
 		if ns.QuestDebug then ns:QuestDebug() end
 		return

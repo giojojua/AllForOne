@@ -294,9 +294,9 @@ local specList = {
 		Frost = { 44572, 43039, 11426, 31687, 44544, 57761, 11958, 12472 }, -- Deep Freeze, Ice Barrier, Water Elemental, Fingers of Frost, Brain Freeze, Cold Snap, Icy Veins
 	},
 	WARLOCK = {
-		Affliction = { 59164, 48181, 47843, 30108, 31117, 18223 },          -- Haunt, Unstable Affliction (+ silence), Curse of Exhaustion
+		Affliction = { 59164, 48181, 47843, 30108, 31117, 18223, 64371 },   -- Haunt, Unstable Affliction (+ silence), Curse of Exhaustion, Eradication
 		Demonology = { 47241, 30146, 47193, 71165, 63167, 19028 },          -- Metamorphosis, Felguard, Demonic Empowerment, Molten Core, Decimation, Soul Link
-		Destruction = { 59172, 50796, 47847, 30283, 17962, 54277, 34936, 17877 }, -- Chaos Bolt, Shadowfury, Conflagrate, Backdraft, Backlash, Shadowburn
+		Destruction = { 59172, 50796, 47847, 30283, 17962, 54277, 34936, 17877, 63244, 47283 }, -- Chaos Bolt, Shadowfury, Conflagrate, Backdraft, Backlash, Shadowburn, Pyroclasm, Empowered Imp
 	},
 	DEATHKNIGHT = {
 		Blood = { 55262, 55050, 49016, 49028, 55233, 49005 },               -- Heart Strike, Hysteria, Dancing Rune Weapon, Vampiric Blood, Mark of Blood
