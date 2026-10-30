@@ -22,9 +22,20 @@ local function Learn(unit)
 		if name and c then classByName[name] = c end
 	end
 end
+-- your party / raid and your friends list: their names are light blue on friendly plates
+local groupNames, friendNames = {}, {}
 local function LearnGroup()
-	for i = 1, 4 do Learn("party" .. i) end
-	for i = 1, (GetNumRaidMembers and GetNumRaidMembers() or 0) do Learn("raid" .. i) end
+	wipe(groupNames)
+	for i = 1, 4 do
+		Learn("party" .. i)
+		local n = UnitExists("party" .. i) and UnitName("party" .. i)
+		if n then groupNames[n] = true end
+	end
+	for i = 1, (GetNumRaidMembers and GetNumRaidMembers() or 0) do
+		Learn("raid" .. i)
+		local n = UnitName("raid" .. i)
+		if n then groupNames[n] = true end
+	end
 end
 local LOCAL_TO_TOKEN
 local function Token(localized)
@@ -46,8 +57,10 @@ local function LearnGuild()
 end
 local function LearnFriends()
 	if not (GetNumFriends and GetFriendInfo) then return end
+	wipe(friendNames)
 	for i = 1, GetNumFriends() do
 		local name, _, class = GetFriendInfo(i)
+		if name then friendNames[name] = true end
 		local token = Token(class)
 		if name and token then classByName[name] = token end
 	end
@@ -590,6 +603,12 @@ local function UpdatePlate(plate, d)
 	-- text: name above, health inside the bar (friends too; the arena number and kill marks are enemy-only)
 	do
 		d.name:SetText(name or "")
+		-- friendly players in your group or on your friends list: light blue name
+		if friendly and name and (groupNames[name] or friendNames[name]) then
+			d.name:SetTextColor(0.45, 0.78, 1)
+		else
+			d.name:SetTextColor(1, 1, 1)
+		end
 		local cur = d.health:GetValue() or 0
 		local pct = (max and max > 0) and floor(cur / max * 100 + 0.5) or 0
 		-- some servers only send percentages (max 100): then just show the %
