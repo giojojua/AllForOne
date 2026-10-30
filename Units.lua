@@ -537,7 +537,7 @@ function ns:ScanDebuffs(unit, max)
 			out[#out + 1] = { icon = icon, count = count, dur = duration, expires = expires, dispel = dispel, prio = 1 }
 		end
 	end
-	table.sort(out, function(a, b) return a.prio > b.prio end)
+	ns:Sort(out, function(a, b) return (a.prio or 0) > (b.prio or 0) end)
 	while #out > max do table.remove(out) end
 	return out
 end
@@ -605,17 +605,21 @@ function Target:UpdateAuras()
 			local name, _, icon, count, dispel, duration, expires, _, stealable = UnitAura("target", i, "HELPFUL")
 			if not name then break end
 			local purge = enemy and (stealable or dispel == "Magic") and true or false
-			buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = (expires and expires > 0) and expires or nil, purge = purge, index = i }
+			buffs[#buffs + 1] = { icon = icon, count = count, dur = duration, expires = ns:AuraTime(expires), purge = purge, index = i }
 		end
-		table.sort(buffs, function(a, b)
+		ns:Sort(buffs, function(a, b)
 			if a.purge ~= b.purge then return a.purge end
-			return (a.expires or 1e9) < (b.expires or 1e9) -- short ones first, permanent ones last
+			local ea, eb = a.expires or 1e9, b.expires or 1e9
+			if ea ~= eb then return ea < eb end -- short ones first, permanent ones last
+			return (a.index or 0) < (b.index or 0)
 		end)
 	end
 	-- crowd control first, then yours by time left
-	table.sort(debuffs, function(a, b)
+	ns:Sort(debuffs, function(a, b)
 		if (a.cc and 1 or 0) ~= (b.cc and 1 or 0) then return a.cc and true or false end
-		return (a.expires or 1e9) < (b.expires or 1e9)
+		local ea, eb = ns:AuraTime(a.expires) or 1e9, ns:AuraTime(b.expires) or 1e9
+		if ea ~= eb then return ea < eb end
+		return (a.index or 0) < (b.index or 0)
 	end)
 	local maxDebuffs = #self.debuffs
 	for i, icon in ipairs(self.debuffs) do

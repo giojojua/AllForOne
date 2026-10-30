@@ -171,6 +171,26 @@ for class, h in pairs({
 	ns.CLASS_COLORS[class] = { r = r, g = g, b = b, hex = h }
 end
 
+-- Sorting aura lists: a plain insertion sort (lists are 40 items at most). Unlike table.sort it
+-- can never hand the compare function a missing entry, even if the server sends odd aura data.
+function ns:Sort(list, less)
+	for i = 2, #list do
+		local v, j = list[i], i - 1
+		while j >= 1 and less(v, list[j]) do
+			list[j + 1] = list[j]
+			j = j - 1
+		end
+		list[j + 1] = v
+	end
+	return list
+end
+
+-- an aura's end time as a plain number: nil for "no timer" and for anything odd (NaN, 0, huge)
+function ns:AuraTime(expires)
+	if type(expires) ~= "number" or expires ~= expires or expires <= 0 or expires > 1e8 then return nil end
+	return expires
+end
+
 function ns:ClassColor(class)
 	local c = class and (ns.CLASS_COLORS[class] or RAID_CLASS_COLORS[class])
 	if c then return c.r, c.g, c.b end

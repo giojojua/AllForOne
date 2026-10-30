@@ -167,7 +167,7 @@ function ns:GetAuras(guid)
 			if a.mine then mine[#mine + 1] = a end
 		end
 	end
-	table.sort(mine, function(x, y) return (x.expires or 1e9) < (y.expires or 1e9) end)
+	ns:Sort(mine, function(x, y) return (ns:AuraTime(x.expires) or 1e9) < (ns:AuraTime(y.expires) or 1e9) end)
 	return best, mine
 end
 
