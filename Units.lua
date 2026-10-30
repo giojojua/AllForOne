@@ -481,19 +481,21 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	end
 
 	f.side = {}
+	-- enemy side: diminishing returns, big (42px) so the count and reset timer read at a glance
+	local SIDE, SIDE_GAP = enemy and 42 or 30, enemy and 46 or 34
 	for i = 1, 4 do
-		local icon = ns:CreateIcon(f, 30, 14)
+		local icon = ns:CreateIcon(f, SIDE, enemy and 18 or 14)
 		if enemy then
 			-- diminishing returns reset: drop the icon right away (no DR event fires at that moment)
 			icon.onExpire = function() f:UpdateSide() end
 			-- DR count in the bottom-right corner, reset timer in the middle
-			ns:Font(icon.count, 13, true)
+			ns:Font(icon.count, 17, true)
 		end
 		icon:ClearAllPoints()
 		if not enemy then
-			icon:SetPoint("TOPLEFT", f, "TOPLEFT", ROW_W + 8 + (i - 1) * 34, -5)
+			icon:SetPoint("TOPLEFT", f, "TOPLEFT", ROW_W + 8 + (i - 1) * SIDE_GAP, -5)
 		else
-			icon:SetPoint("TOPRIGHT", f, "TOPLEFT", -8 - (i - 1) * 34, -5)
+			icon:SetPoint("TOPRIGHT", f, "TOPLEFT", -8 - (i - 1) * SIDE_GAP, 0)
 		end
 		f.side[i] = icon
 	end
