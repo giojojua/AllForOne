@@ -322,8 +322,17 @@ local function UpdateTimers()
 	end
 end
 
+-- "the stables" -> "Stables", "gold mine" -> "Gold Mine" (small words like "of" stay lower case)
+local SMALL = { of = true, the = true, ["and"] = true }
 local function Clean(node)
 	node = node:gsub("^[Tt]he ", "")
+	local first = true
+	node = node:gsub("(%a)([%w']*)", function(a, rest)
+		local word = a .. rest
+		if not first and SMALL[word:lower()] then first = false return word:lower() end
+		first = false
+		return a:upper() .. rest
+	end)
 	return node
 end
 
