@@ -279,7 +279,7 @@ local function ScanUnit(unit)
 		end
 		if caster == "player" or caster == "pet" then mine[#mine + 1] = a end
 	end
-	table.sort(mine, function(x, y) return (x.expires or 1e9) < (y.expires or 1e9) end)
+	ns:Sort(mine, function(x, y) return (ns:AuraTime(x.expires) or 1e9) < (ns:AuraTime(y.expires) or 1e9) end)
 	return best, mine
 end
 
