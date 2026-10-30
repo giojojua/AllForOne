@@ -624,6 +624,85 @@ local function EditBoxEdge(eb, r, g, b)
 	if not eb.afoEdge then return end
 	for _, t in ipairs(eb.afoEdge) do t:SetTexture(r, g, b, 0.9) end
 end
+----------------------------------------------------------------------
+-- Copyable links in chat: web addresses become blue [links]; click one and a box pops up with
+-- the address selected, ready for Ctrl+C (the 3.3.5 client can't open or copy them itself)
+----------------------------------------------------------------------
+local TLDS = { com = true, net = true, org = true, gg = true, io = true, tv = true, eu = true,
+	ru = true, ge = true, de = true, uk = true, info = true }
+local function LinkFor(url)
+	return "|cff4da6ff|Hafourl:" .. url .. "|h[" .. url .. "]|h|r"
+end
+function ns.LinkifyURLs(msg)
+	if type(msg) ~= "string" or msg:find("|Hafourl:", 1, true) then return msg end
+	-- leave existing item / spell / player links alone: only touch plain text between them
+	local out, pos = {}, 1
+	while true do
+		local s, e = msg:find("|H.-|h.-|h", pos)
+		local chunk = msg:sub(pos, (s or 0) - 1)
+		if not s then chunk = msg:sub(pos) end
+		local done = {}
+		-- keep sentence punctuation out of the link: "go to warmane.com." -> link + "."
+		local function Keep(u)
+			local core, tail = u:match("^(.-)([%.,!%?%)%]]*)$")
+			done[#done + 1] = core
+			return "\001" .. #done .. "\002" .. tail
+		end
+		-- 1) http(s):// and www.
+		chunk = chunk:gsub("(https?://[^%s|]+)", Keep)
+		chunk = chunk:gsub("(www%.[^%s|\001\002]+)", Keep)
+		-- 2) bare domains with a known ending: discord.gg/abc, warmane.com
+		chunk = chunk:gsub("([%w][%w%-%.]*%.(%a+)(/?[^%s|]*))", function(u, tld)
+			if not TLDS[tld:lower()] then return nil end
+			return Keep(u)
+		end)
+		chunk = chunk:gsub("\001(%d+)\002", function(i) return LinkFor(done[tonumber(i)]) end)
+		out[#out + 1] = chunk
+		if not s then break end
+		out[#out + 1] = msg:sub(s, e)
+		pos = e + 1
+	end
+	return table.concat(out)
+end
+
+local pendingURL -- the address the copy box shows
+local function SetupLinks()
+	if not ChatFrame_AddMessageEventFilter then return end
+	local function Filter(_, _, msg, ...)
+		local new = ns.LinkifyURLs(msg)
+		if new ~= msg then return false, new, ... end
+	end
+	for _, ev in ipairs({ "CHAT_MSG_SAY", "CHAT_MSG_YELL", "CHAT_MSG_WHISPER", "CHAT_MSG_WHISPER_INFORM",
+		"CHAT_MSG_GUILD", "CHAT_MSG_OFFICER", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID",
+		"CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING", "CHAT_MSG_BATTLEGROUND", "CHAT_MSG_BATTLEGROUND_LEADER",
+		"CHAT_MSG_CHANNEL", "CHAT_MSG_SYSTEM", "CHAT_MSG_EMOTE", "CHAT_MSG_AFK", "CHAT_MSG_DND" }) do
+		ChatFrame_AddMessageEventFilter(ev, Filter)
+	end
+	StaticPopupDialogs = StaticPopupDialogs or {}
+	StaticPopupDialogs.AFO_COPY_URL = {
+		text = "Press Ctrl+C to copy the link", button1 = CLOSE or "Close",
+		hasEditBox = 1, editBoxWidth = 360, timeout = 0, whileDead = 1, hideOnEscape = 1,
+		OnShow = function(self)
+			local eb = self.editBox or _G[self:GetName() .. "EditBox"]
+			eb:SetText(pendingURL or "")
+			eb:HighlightText()
+			eb:SetFocus()
+		end,
+		EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
+		EditBoxOnEnterPressed = function(eb) eb:GetParent():Hide() end,
+	}
+	-- clicking our link opens the copy box; every other link works as before
+	local orig = SetItemRef
+	SetItemRef = function(link, text, button, ...)
+		if type(link) == "string" and link:find("^afourl:") then
+			pendingURL = link:sub(8)
+			if StaticPopup_Show then StaticPopup_Show("AFO_COPY_URL") end
+			return
+		end
+		return orig(link, text, button, ...)
+	end
+end
+
 local function StyleEditBox(eb)
 	if not eb or eb.afoStyled then return end
 	eb.afoStyled = true
@@ -756,6 +835,8 @@ local function SetupChat()
 			if info then EditBoxEdge(eb, info.r, info.g, info.b) end
 		end)
 	end
+	local ok, err = pcall(SetupLinks)
+	if not ok then ns:Report(err) end
 end
 
 ----------------------------------------------------------------------
