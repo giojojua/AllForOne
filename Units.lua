@@ -251,15 +251,39 @@ function Row:UpdatePower()
 	self.power:SetValue(cur or 0)
 end
 
-function Row:UpdateName()
-	local u = self.unit
-	self.nameText:SetText(LabelFor(u))
-	PaintHealth(self.health, self.nameText, u)
-	local class = U.Class(u)
+local function PaintClass(self)
+	local class = U.Class(self.unit)
 	local coords = class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
 	if coords then
 		self.classIcon.tex:SetTexture(CLASS_TEX)
 		self.classIcon.tex:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
+	end
+end
+
+function Row:UpdateName()
+	local u = self.unit
+	self.nameText:SetText(LabelFor(u))
+	PaintHealth(self.health, self.nameText, u)
+	if self.enemy then self:UpdateCC() else PaintClass(self) end
+end
+
+-- Enemy in crowd control: the CC takes the class icon's place (big, with its timer).
+-- Back to the class icon when it ends.
+function Row:UpdateCC()
+	local icon = self.classIcon
+	local best = ns:GetAuras(U.GUID(self.unit))
+	if best and best.icon then
+		icon:Set(best.icon, nil, best.dur, best.expires, true)
+		icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		icon:SetBorder(colors.danger[1], colors.danger[2], colors.danger[3])
+		self.inCC = true
+	else
+		if self.inCC then
+			icon:Set(nil) -- stops the timer and the sweep
+			icon:SetBorder(nil)
+			self.inCC = false
+		end
+		PaintClass(self)
 	end
 end
 
@@ -298,13 +322,13 @@ function Row:UpdateSide()
 		for i, icon in ipairs(self.side) do
 			local d = list[i]
 			if d then
-				local c, mark
-				if d.count <= 1 then c, mark = colors.drHalf, "½"
-				elseif d.count == 2 then c, mark = colors.drQuarter, "¼"
-				else c, mark = colors.drImmune, "×" end
-				icon:Set(d.icon, nil, ns.DR_RESET, (not d.active) and d.reset or nil)
+				-- corner: how many times that crowd control was used - 1 (next one half),
+				-- 2 (next one a quarter), 3 (immune). Middle: seconds until it resets to full duration.
+				local n = math.min(3, d.count)
+				local c = (n == 1 and colors.drHalf) or (n == 2 and colors.drQuarter) or colors.drImmune
+				icon:Set(d.icon, nil, ns.DR_RESET, d.full)
 				icon:SetBorder(c[1], c[2], c[3])
-				icon.count:SetText(mark)
+				icon.count:SetText(n)
 				icon.count:SetTextColor(c[1], c[2], c[3])
 			else
 				icon:Clear()
@@ -417,10 +441,11 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	for k, v in pairs(Row) do f[k] = v end
 	f:SetPoint("TOPLEFT", holder, "TOPLEFT", 0, -(index - 1) * ROW_STRIDE)
 
-	f.classIcon = ns:CreateIcon(f, 40)
+	f.classIcon = ns:CreateIcon(f, 40, 18)
 	f.classIcon:Show()
 	f:Place(f.classIcon, 0, 0, 40, 40)
 	if enemy then
+		f.classIcon.onExpire = function() f:UpdateCC() end
 		f.num = ns:CreateText(f.classIcon, 12, true, "LEFT")
 		f.num:SetPoint("TOPLEFT", 3, -2)
 		f.num:SetText(unit:match("%d"))
@@ -457,7 +482,13 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 
 	f.side = {}
 	for i = 1, 4 do
-		local icon = ns:CreateIcon(f, 30, 12)
+		local icon = ns:CreateIcon(f, 30, 14)
+		if enemy then
+			-- diminishing returns reset: drop the icon right away (no DR event fires at that moment)
+			icon.onExpire = function() f:UpdateSide() end
+			-- DR count in the bottom-right corner, reset timer in the middle
+			ns:Font(icon.count, 13, true)
+		end
 		icon:ClearAllPoints()
 		if not enemy then
 			icon:SetPoint("TOPLEFT", f, "TOPLEFT", ROW_W + 8 + (i - 1) * 34, -5)
@@ -932,6 +963,11 @@ local function RefreshGUID(guid, method)
 end
 ns:Listen("COOLDOWN", function(guid) RefreshGUID(guid, "UpdateCooldowns"); RefreshGUID(guid, "UpdateTrinket") end)
 ns:Listen("DR", function(guid) RefreshGUID(guid, "UpdateSide") end)
+ns:Listen("AURAS", function(guid)
+	for _, f in ipairs(frames) do
+		if f.enemy and f.unit and U.GUID(f.unit) == guid then f:UpdateCC() end
+	end
+end)
 ns:Listen("SPEC", function(guid) RefreshGUID(guid, "UpdateName") end)
 
 -- Slow refresh for things without good events (target of target, range, highlight)
