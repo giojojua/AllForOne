@@ -175,6 +175,9 @@ local function Build()
 	Add(Check(win, "Announce kill target in party chat", nil,
 		function() return ns.db.announceKill ~= false end,
 		function(v) ns.db.announceKill = v end))
+	Add(Check(win, "Announce crowd control in party chat", "you, teammates, your CC, trinkets",
+		function() return ns.db.announceCC ~= false end,
+		function(v) ns.db.announceCC = v end))
 	Add(Check(win, "Arena analyzer", "records this character's last 50 arenas",
 		function() return ns.db.analyzerOn ~= false end,
 		function(v) ns.db.analyzerOn = v end))
