@@ -401,3 +401,84 @@ end)
 ns:On("PLAYER_TARGET_CHANGED", function() ScanSpec("target") end)
 ns:On("PLAYER_FOCUS_CHANGED", function() ScanSpec("focus") end)
 ns:On("UPDATE_MOUSEOVER_UNIT", function() ScanSpec("mouseover") end)
+
+----------------------------------------------------------------------
+-- Arena only: crowd control and trinkets announced in party chat
+--   you:      "I'm stunned - Kidney Shot 6s" / "Trinket used"
+--   teammate: "Shade is feared - Psychic Scream 8s" / "Shade used trinket"
+--   your CC:  "Polymorph on Vex 8s"
+-- Roots are left out (too much spam); anything shorter than 2 seconds too.
+----------------------------------------------------------------------
+local ANNOUNCE_SKIP = { root = true }
+local pending, lastSent = {}, {}
+local function PartySay(msg)
+	if not msg or not GetNumPartyMembers or GetNumPartyMembers() == 0 then return end
+	local now = GetTime()
+	if lastSent[msg] and now - lastSent[msg] < 1.5 then return end
+	lastSent[msg] = now
+	SendChatMessage(msg, "PARTY")
+end
+local function Pretty(label) return label and (label:sub(1, 1) .. label:sub(2):lower()) or "crowd controlled" end
+-- seconds left on that aura (the server sends it a moment after the combat log event)
+local function AuraLeft(unit, spell, fallback)
+	if unit and UnitExists(unit) then
+		local name, _, _, _, _, _, expires = UnitAura(unit, spell, nil, "HARMFUL")
+		if name and type(expires) == "number" and expires > 0 then return expires - GetTime() end
+	end
+	return fallback
+end
+local announcer = CreateFrame("Frame")
+announcer:Hide()
+announcer:SetScript("OnUpdate", function(self)
+	local now = GetTime()
+	for i = #pending, 1, -1 do
+		local p = pending[i]
+		if now >= p.at then
+			table.remove(pending, i)
+			local left = AuraLeft(p.unit, p.spell, p.dur)
+			if left and left >= 2 then PartySay(format(p.text, floor(left + 0.5))) end
+		end
+	end
+	if #pending == 0 then self:Hide() end
+end)
+local function Queue(text, unit, spell, dur)
+	pending[#pending + 1] = { at = GetTime() + 0.15, text = text, unit = unit, spell = spell, dur = dur }
+	announcer:Show()
+end
+
+local function PartyUnit(guid)
+	for i = 1, 4 do
+		local u = "party" .. i
+		if UnitGUID(u) == guid then return u end
+	end
+end
+
+ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, spellId, spellName)
+	if ns.db.announceCC == false or not ns:InArena() or not spellName then return end
+	local me = UnitGUID("player")
+	if event == "SPELL_AURA_APPLIED" then
+		local cc = ns.CC[spellName]
+		if not cc or ANNOUNCE_SKIP[cc.cat] then return end
+		local label = Pretty(ns.ccLabel[cc.cat])
+		if dstGUID == me then
+			Queue("I'm " .. label:lower() .. " - " .. spellName .. " %ds", "player", spellName, cc.dur)
+		elseif PartyUnit(dstGUID) then
+			local u = PartyUnit(dstGUID)
+			Queue((UnitName(u) or dstName or "?") .. " is " .. label:lower() .. " - " .. spellName .. " %ds", u, spellName, cc.dur)
+		elseif (srcGUID == me or srcGUID == UnitGUID("pet")) and dstFlags and bit.band(dstFlags, COMBATLOG_OBJECT_REACTION_HOSTILE or 0x40) > 0 then
+			local u = ns.unitOf[dstGUID]
+			-- your CC lasts less on a diminished target: read the real duration when we can
+			local dur = cc.dur
+			local s = ns.dr[dstGUID] and ns.dr[dstGUID][cc.cat]
+			if s and s.count and s.count > 1 then dur = dur / (2 ^ (s.count - 1)) end
+			Queue(spellName .. " on " .. (dstName and dstName:match("^[^-]+") or "?") .. " %ds", u, spellName, dur)
+		end
+	elseif event == "SPELL_CAST_SUCCESS" and ns.Trinket[spellName] then
+		if srcGUID == me then
+			PartySay("Trinket used")
+		else
+			local u = PartyUnit(srcGUID)
+			if u then PartySay((UnitName(u) or srcName or "?") .. " used trinket") end
+		end
+	end
+end)

@@ -95,6 +95,7 @@ ns.defaults = {
 	macroNames = true,      -- macro names on action buttons
 	killHelper = true,      -- arena kill target helper (KILL / CC markers)
 	announceKill = true,    -- announce kill target changes in party chat
+	announceCC = true,      -- arena: crowd control + trinkets in party chat
 	analyzerOn = true,      -- record arena matches (last 50)
 	analyzerPopup = true,   -- small report popup after each arena
 	usableColors = true,    -- tint action buttons: red out of range, blue no power
