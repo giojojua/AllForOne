@@ -1,3 +1,5 @@
+<img width="1445" height="934" alt="Screenshot 2026-10-31 at 19 11 43" src="https://github.com/user-attachments/assets/98b41954-c9ba-4b1c-bb37-85df95ae6a29" />
+
 # AllForOne
 
 A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
