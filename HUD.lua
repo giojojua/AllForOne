@@ -845,6 +845,8 @@ end
 local status
 local matchStart, gatesAt
 
+-- (only messages about the start: "...begins in 1 minute", "One minute until the Arena battle
+-- begins!" - other battleground messages also say "in 1 minute")
 local COUNTDOWN_MSGS = {
 	{ "One minute", 60 }, { "Thirty seconds", 30 }, { "Fifteen seconds", 15 },
 	-- battlegrounds: "The battle for Warsong Gulch begins in 1 minute."
@@ -873,13 +875,55 @@ local function LowestScoreLine()
 	return lowest or (WorldStateAlwaysUpFrame and WorldStateAlwaysUpFrame:IsVisible() and WorldStateAlwaysUpFrame) or nil
 end
 
+-- Centered under what you actually see: the score lines' icons + text. Blizzard's line frames
+-- are narrower than their text (Eye of the Storm's "Bases: 0  Victory Points: 0/1600" runs far
+-- past its frame), so centering on the frame put the bar off to the left.
+local function ScoreBounds()
+	local left, right, bottom
+	for i = 1, (NUM_ALWAYS_UP_UI_FRAMES or 10) do
+		local f = _G["AlwaysUpFrame" .. i]
+		local txt = _G["AlwaysUpFrame" .. i .. "Text"]
+		-- only lines that actually show text: an empty line's icon / text box sits off to the
+		-- left and dragged the center (and the bar) sideways
+		local shown = txt and txt:IsVisible() and (txt:GetText() or "") ~= "" and (txt:GetStringWidth() or 0) > 0
+		if f and f:IsVisible() and shown then
+			local sc = f:GetEffectiveScale()
+			for _, r in ipairs({ _G["AlwaysUpFrame" .. i .. "Icon"], txt, f }) do
+				if r and r:IsVisible() and r:GetLeft() then
+					local l = r:GetLeft() * sc
+					local w = (r.GetStringWidth and r:GetStringWidth() or r:GetWidth() or 0) * sc
+					local b = (r:GetBottom() or 0) * sc
+					-- a frame without its own text only counts for height, not width
+					if r ~= f then
+						left = left and math.min(left, l) or l
+						right = right and math.max(right, l + w) or (l + w)
+					end
+					bottom = bottom and math.min(bottom, b) or b
+				end
+			end
+		end
+	end
+	return left, right, bottom
+end
+
 local function StatusUnderScore()
-	local anchor = LowestScoreLine()
-	if not anchor then return end
-	if status.underScore == anchor then return end
-	status.underScore = anchor
+	local left, right, bottom = ScoreBounds()
+	if not (left and right and bottom) then
+		-- fallback: under the lowest line frame
+		local anchor = LowestScoreLine()
+		if not anchor or status.underScore == anchor then return end
+		status.underScore = anchor
+		status:ClearAllPoints()
+		status:SetPoint("TOP", anchor, "BOTTOM", 0, -8)
+		return
+	end
+	local sc = status:GetEffectiveScale()
+	local x, y = (left + right) / 2 / sc, bottom / sc - 8
+	-- the score text changes width as bases are taken: follow it, but don't re-anchor for nothing
+	if status.underScore == "text" and status.ux and math.abs(status.ux - x) < 1 and math.abs(status.uy - y) < 1 then return end
+	status.underScore, status.ux, status.uy = "text", x, y
 	status:ClearAllPoints()
-	status:SetPoint("TOP", anchor, "BOTTOM", 0, -8)
+	status:SetPoint("TOP", UIParent, "BOTTOMLEFT", x, y)
 end
 
 local function StatusBackToLayout()
@@ -985,12 +1029,18 @@ ns:On("CHAT_MSG_BG_SYSTEM_NEUTRAL", function(_, msg)
 	if not msg then return end
 	local _, kind = IsInInstance()
 	if kind ~= "arena" and kind ~= "pvp" then return end
-	for _, m in ipairs(COUNTDOWN_MSGS) do
-		if msg:find(m[1]) then gatesAt = GetTime() + m[2] return end
-	end
-	if msg:find("has begun") then
+	local lower = msg:lower()
+	-- the battle started: "has begun" (arena, AB, EotS, IoC...), "Let the battle for Warsong Gulch
+	-- begin!", "The battle has begun!" - drop the countdown right away
+	if lower:find("has begun") or lower:find("begin!") then
 		gatesAt = nil
 		matchStart = GetTime()
+		return
+	end
+	if lower:find("begin") then
+		for _, m in ipairs(COUNTDOWN_MSGS) do
+			if msg:find(m[1]) then gatesAt = GetTime() + m[2] return end
+		end
 	end
 end)
 
