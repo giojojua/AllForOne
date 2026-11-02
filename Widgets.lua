@@ -261,6 +261,26 @@ local function AbsorbNames()
 	end
 	return absorbNames
 end
+-- first "Absorbs / Absorbing N" amount in a tooltip (not "75%"), or nil
+local function ReadAbsorb(fill)
+	if not scan then
+		scan = CreateFrame("GameTooltip", "AllForOneAbsorbScan", nil, "GameTooltipTemplate")
+	end
+	-- a hidden reading tooltip needs its owner set again before every read
+	scan:SetOwner(WorldFrame, "ANCHOR_NONE")
+	scan:ClearLines()
+	fill(scan)
+	for l = 2, (scan:NumLines() or 0) do
+		local fs = _G["AllForOneAbsorbScanTextLeft" .. l]
+		local text = fs and fs:GetText()
+		if text then
+			local n = text:match("[Aa]bsorb%a*%s+(%d+)%s*[^%%%d]") or text:match("[Aa]bsorb%a*%s+(%d+)$")
+				or text:match("[Aa]bsorb%a*%s+up%s+to%s+(%d+)")
+			if n then return tonumber(n) end
+		end
+	end
+end
+
 -- total "Absorbs N" on the unit's shield buffs (0 if none)
 local cache, cacheAt = {}, 0
 local absorbState = {} -- guid -> { full = tooltip amount, used = absorbed since }
@@ -270,27 +290,20 @@ function ns:GetAbsorb(unit)
 	local now = GetTime()
 	if now - cacheAt > 0.2 then wipe(cache); cacheAt = now end
 	if cache[unit] then return cache[unit] end
-	local total = 0
+	local total, unknown = 0, false
 	if UnitExists(unit) then
 		local names = AbsorbNames()
 		for i = 1, 40 do
-			local name = UnitBuff(unit, i)
+			local name, _, _, _, _, _, _, _, _, _, spellId = UnitBuff(unit, i)
 			if not name then break end
 			if names[name] then
-				if not scan then
-					scan = CreateFrame("GameTooltip", "AllForOneAbsorbScan", nil, "GameTooltipTemplate")
+				-- 1) the buff's own tooltip ("Absorbs 2230 damage")
+				local n = ReadAbsorb(function(tip) tip:SetUnitBuff(unit, i) end)
+				-- 2) some servers' buff tooltips have no number: use the spell's description
+				if not n and spellId then
+					n = ReadAbsorb(function(tip) tip:SetHyperlink("spell:" .. spellId) end)
 				end
-				-- a hidden reading tooltip needs its owner set again before every read
-				scan:SetOwner(WorldFrame, "ANCHOR_NONE")
-				scan:ClearLines()
-				scan:SetUnitBuff(unit, i)
-				for l = 2, scan:NumLines() do
-					local fs = _G["AllForOneAbsorbScanTextLeft" .. l]
-					local text = fs and fs:GetText()
-					local n = text and text:match("[Aa]bsorb%a*%s+(%d+)%s*[^%%%d]")
-						or (text and text:match("[Aa]bsorb%a*%s+(%d+)$"))
-					if n then total = total + tonumber(n) break end
-				end
+				if n then total = total + n else unknown = true end
 			end
 		end
 	end
@@ -300,13 +313,15 @@ function ns:GetAbsorb(unit)
 	if g then
 		local st = absorbState[g]
 		if total <= 0 then
-			absorbState[g] = nil
+			if not unknown then absorbState[g] = nil end
 		elseif not st or st.full ~= total then
 			absorbState[g] = { full = total, used = 0 }
 		else
 			total = math.max(0, total - st.used)
 		end
 	end
+	-- a shield we can't read a number for: still show that it's there (a short striped piece)
+	if total <= 0 and unknown then total = -1 end
 	cache[unit] = total
 	return total
 end
@@ -372,6 +387,8 @@ local function PaintAbsorb(bar, amount)
 	local min, max = bar:GetMinMaxValues()
 	local cur = bar:GetValue() or 0
 	local w = bar:GetWidth() or 0
+	local unknownSize = amount == -1
+	if unknownSize then amount = (max or 0) * 0.08 end
 	if not amount or amount <= 0 or not max or max <= 0 or w <= 0 then
 		bar.absorb:Hide(); bar.absorbEdge:Hide(); bar.absorbGlow:Hide()
 		if bar.absorbText and bar.absorbText:IsShown() then
@@ -404,7 +421,7 @@ local function PaintAbsorb(bar, amount)
 	bar.absorbEdge:Show()
 	bar.absorbGlow:Show()
 	if bar.absorbText then
-		bar.absorbText:SetText("+" .. ShortNum(amount))
+		bar.absorbText:SetText(unknownSize and "+?" or ("+" .. ShortNum(amount)))
 		if not bar.absorbText:IsShown() then
 			bar.absorbText:Show()
 			if bar.absorbName then bar.absorbName:SetPoint("RIGHT", bar.absorbText, "LEFT", -4, 0) end
