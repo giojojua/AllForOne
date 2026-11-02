@@ -263,6 +263,7 @@ local function AbsorbNames()
 end
 -- total "Absorbs N" on the unit's shield buffs (0 if none)
 local cache, cacheAt = {}, 0
+local absorbState = {} -- guid -> { full = tooltip amount, used = absorbed since }
 function ns:GetAbsorb(unit)
 	if not unit then return 0 end
 	if ns.testing and ns.fake and ns.fake[unit] then return ns.fake[unit].absorb or 0 end
@@ -293,9 +294,44 @@ function ns:GetAbsorb(unit)
 			end
 		end
 	end
+	-- most servers' tooltips show the shield's full value, not what's left: count down the
+	-- damage it absorbed (combat log) until the tooltip value changes (new / refreshed shield)
+	local g = UnitGUID(unit)
+	if g then
+		local st = absorbState[g]
+		if total <= 0 then
+			absorbState[g] = nil
+		elseif not st or st.full ~= total then
+			absorbState[g] = { full = total, used = 0 }
+		else
+			total = math.max(0, total - st.used)
+		end
+	end
 	cache[unit] = total
 	return total
 end
+
+-- absorbed damage from the combat log, per target GUID
+ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, _, _, _, dstGUID, _, _, ...)
+	local st = dstGUID and absorbState[dstGUID]
+	if not st then return end
+	local absorbed
+	if event == "SWING_DAMAGE" then
+		absorbed = select(6, ...)
+	elseif event == "SPELL_DAMAGE" or event == "SPELL_PERIODIC_DAMAGE" or event == "RANGE_DAMAGE" then
+		absorbed = select(9, ...)
+	elseif event == "SWING_MISSED" then
+		local missType, amount = ...
+		if missType == "ABSORB" then absorbed = amount end
+	elseif event == "SPELL_MISSED" or event == "SPELL_PERIODIC_MISSED" or event == "RANGE_MISSED" then
+		local _, _, _, missType, amount = ...
+		if missType == "ABSORB" then absorbed = amount end
+	end
+	if absorbed and absorbed > 0 then
+		st.used = st.used + absorbed
+		wipe(cache)
+	end
+end)
 
 local absorbBars = {}
 -- bar: a health StatusBar; getUnit(): the unit it shows. hpText / nameText (optional): the
