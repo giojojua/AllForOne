@@ -473,7 +473,12 @@ function M:Update()
 			row:Hide()
 		end
 	end
-	if #list == 0 then win.empty:Show() else win.empty:Hide() end
+	-- nothing recorded: no background at all, only the title and buttons stay visible
+	local empty = #list == 0
+	win.fill:SetAlpha(empty and 0 or 1)
+	win.frameLine:SetAlpha(empty and 0 or 1)
+	win.barBg:SetAlpha(empty and 0 or 1)
+	win.empty:Hide()
 end
 
 local function IconButton(parent, texture, tip, onClick)
@@ -531,6 +536,7 @@ local function Build()
 	win.fill:SetTexture(0.035, 0.04, 0.045, 0.88)
 	-- thin light frame around the window, like Details!
 	local frameLine = win:CreateTexture(nil, "BACKGROUND", nil, -1)
+	win.frameLine = frameLine
 	frameLine:SetTexture(0.32, 0.33, 0.36, 1)
 	frameLine:SetPoint("TOPLEFT", -1, 1)
 	frameLine:SetPoint("BOTTOMRIGHT", 1, -1)
@@ -546,6 +552,7 @@ local function Build()
 	local barBg = bar:CreateTexture(nil, "BACKGROUND")
 	barBg:SetAllPoints(bar)
 	barBg:SetTexture(0, 0, 0, 0.3)
+	win.barBg = barBg
 	-- toolbar on the right (gold icons), title on the left
 	local resetBtn = IconButton(bar, "Interface\\Icons\\Spell_Shadow_SacrificialShield", "Reset all data", function() M:Reset() end)
 	resetBtn:SetPoint("RIGHT", -6, 0)
