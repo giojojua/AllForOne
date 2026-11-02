@@ -21,7 +21,7 @@ local function Start(mode)
 	local now = GetTime()
 	local _, myClass = UnitClass("player")
 	ns.fake = {
-		player = { name = UnitName("player"), class = myClass, hp = 72, pw = 64, ptype = UnitPowerType("player") },
+		player = { name = UnitName("player"), class = myClass, hp = 72, pw = 64, ptype = UnitPowerType("player"), absorb = 18 },
 		pet = { name = "Water Elemental", class = myClass, hp = 90, creature = "Elemental" },
 		party1 = { name = "Rogue", class = "ROGUE", hp = 88, pw = 70, ptype = 3 },
 		party2 = { name = "Priest", class = "PRIEST", hp = 64, pw = 58, ptype = 0, drinking = true },
@@ -29,7 +29,7 @@ local function Start(mode)
 		arena2 = { enemy = true, name = "Death Knight", class = "DEATHKNIGHT", hp = 77, pw = 30, ptype = 6 },
 		arenapet2 = { name = "Ghoul", class = "DEATHKNIGHT", hp = 64, creature = "Undead" },
 		arena3 = { enemy = true, name = "Paladin", class = "PALADIN", hp = 58, pw = 81, ptype = 0 },
-		target = { name = "Paladin", class = "PALADIN", hp = 58, pw = 81, ptype = 0 },
+		target = { name = "Paladin", class = "PALADIN", hp = 58, pw = 81, ptype = 0, absorb = 12 },
 		targettarget = { name = "Rogue", class = "ROGUE", hp = 88 },
 		focus = { name = "Death Knight", class = "DEATHKNIGHT", hp = 77 },
 	}

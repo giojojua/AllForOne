@@ -458,6 +458,8 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	f.hpText:SetPoint("RIGHT", -8, 0)
 	f.nameText:SetPoint("LEFT", 8, 0)
 	f.nameText:SetPoint("RIGHT", f.hpText, "LEFT", -6, 0)
+	-- absorb shields (Power Word: Shield, Ice Barrier...) after the health, "+2.2k" by the %
+	ns:AttachAbsorb(f.health, function() return f.unit end, f.hpText, f.nameText)
 
 	f.power = ns:CreateBar(f, 204, 6)
 	f:Place(f.power, 44, 34, 204, 6)
@@ -725,6 +727,7 @@ local function CreateTarget(holder)
 	f.hpText:SetPoint("RIGHT", -8, 0)
 	f.nameText:SetPoint("LEFT", 8, 0)
 	f.nameText:SetPoint("RIGHT", f.hpText, "LEFT", -6, 0)
+	ns:AttachAbsorb(f.health, function() return "target" end, f.hpText, f.nameText)
 
 	f.power = ns:CreateBar(f, 244, 8)
 	f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2)
@@ -813,6 +816,7 @@ local function CreateSmall(unit, w, h, holder, opts)
 	else
 		f.nameText:SetPoint("RIGHT", -6, 0)
 	end
+	ns:AttachAbsorb(f.health, function() return f.unit end, f.hpText, f.hpText and f.nameText)
 	if opts.cast then
 		f.castbar = ns:CreateCastbar(f, w, 10, { iconSize = 0, fontSize = 10, lock = false })
 		f.castbar:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -3)
