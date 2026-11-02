@@ -678,25 +678,43 @@ local function SetupLinks()
 		"CHAT_MSG_CHANNEL", "CHAT_MSG_SYSTEM", "CHAT_MSG_EMOTE", "CHAT_MSG_AFK", "CHAT_MSG_DND" }) do
 		ChatFrame_AddMessageEventFilter(ev, Filter)
 	end
-	StaticPopupDialogs = StaticPopupDialogs or {}
-	StaticPopupDialogs.AFO_COPY_URL = {
-		text = "Press Ctrl+C to copy the link", button1 = CLOSE or "Close",
-		hasEditBox = 1, editBoxWidth = 360, timeout = 0, whileDead = 1, hideOnEscape = 1,
-		OnShow = function(self)
-			local eb = self.editBox or _G[self:GetName() .. "EditBox"]
-			eb:SetText(pendingURL or "")
-			eb:HighlightText()
-			eb:SetFocus()
-		end,
-		EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-		EditBoxOnEnterPressed = function(eb) eb:GetParent():Hide() end,
-	}
+	-- our own small copy box. (Blizzard's StaticPopup system must not be touched: an addon
+	-- writing to StaticPopupDialogs taints it, and then "Replace enchant?" and similar
+	-- confirmations get "blocked from an action only available to the Blizzard UI".)
+	local box = CreateFrame("Frame", "AllForOneCopyBox", UIParent)
+	box:SetSize(420, 74)
+	box:SetPoint("TOP", UIParent, "TOP", 0, -180)
+	box:SetFrameStrata("DIALOG")
+	ns:Skin(box)
+	box.fill:SetTexture(0.05, 0.055, 0.065, 0.96)
+	box:EnableMouse(true)
+	box:Hide()
+	local title = ns:CreateText(box, 13, true, "LEFT")
+	title:SetPoint("TOPLEFT", 10, -8)
+	title:SetText("Press Ctrl+C to copy the link")
+	local eb = CreateFrame("EditBox", "AllForOneCopyBoxEdit", box, "InputBoxTemplate")
+	eb:SetSize(396, 22)
+	eb:SetPoint("BOTTOM", 4, 12)
+	eb:SetAutoFocus(true)
+	eb:SetScript("OnEscapePressed", function() box:Hide() end)
+	eb:SetScript("OnEnterPressed", function() box:Hide() end)
+	-- keep the text as it is (typing would change the link)
+	eb:SetScript("OnTextChanged", function(self) if self:GetText() ~= pendingURL then self:SetText(pendingURL or ""); self:HighlightText() end end)
+	local close = CreateFrame("Button", nil, box, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", 2, 2)
+	box:SetScript("OnShow", function()
+		eb:SetText(pendingURL or "")
+		eb:SetFocus()
+		eb:HighlightText()
+	end)
+	tinsert(UISpecialFrames, "AllForOneCopyBox") -- Esc closes it
 	-- clicking our link opens the copy box; every other link works as before
 	local orig = SetItemRef
 	SetItemRef = function(link, text, button, ...)
 		if type(link) == "string" and link:find("^afourl:") then
 			pendingURL = link:sub(8)
-			if StaticPopup_Show then StaticPopup_Show("AFO_COPY_URL") end
+			box:Hide()
+			box:Show()
 			return
 		end
 		return orig(link, text, button, ...)
