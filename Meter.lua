@@ -477,7 +477,8 @@ function M:Update()
 	local empty = #list == 0
 	win.fill:SetAlpha(empty and 0 or 1)
 	win.frameLine:SetAlpha(empty and 0 or 1)
-	win.barBg:SetAlpha(empty and 0 or 1)
+	-- the title row keeps its dark background either way (on its own it needs to be solid)
+	if empty then win.barBg:SetTexture(0.025, 0.028, 0.032, 0.92) else win.barBg:SetTexture(0, 0, 0, 0.3) end
 	win.empty:Hide()
 end
 
