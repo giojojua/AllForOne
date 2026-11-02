@@ -349,26 +349,42 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, _, _, _, dstGUID, _, 
 end)
 
 local absorbBars = {}
+-- Layers on a health bar, bottom to top: the bar itself (background, health fill, shine),
+-- the absorb shield, then the texts. Separate frames, so the order is guaranteed.
+function ns:TextLayer(bar)
+	if not bar.textLayer then
+		bar.textLayer = CreateFrame("Frame", nil, bar)
+		bar.textLayer:SetAllPoints(bar)
+		bar.textLayer:SetFrameLevel(bar:GetFrameLevel() + 3)
+	end
+	return bar.textLayer
+end
+
 -- bar: a health StatusBar; getUnit(): the unit it shows. hpText / nameText (optional): the
 -- number goes just left of the health text, and the name makes room for it
 function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
-	-- ARTWORK: above the bar's dark background (BORDER), next to the health fill
+	-- own frame above the bar (so it's on top of the health fill), below the texts
+	local layer = CreateFrame("Frame", nil, bar)
+	layer:SetAllPoints(bar)
+	layer:SetFrameLevel(bar:GetFrameLevel() + 1)
+	bar.absorbLayer = layer
+	ns:TextLayer(bar)
 	-- bright diagonal stripes (like the modern game's absorb texture) ...
-	bar.absorb = bar:CreateTexture(nil, "ARTWORK")
+	bar.absorb = layer:CreateTexture(nil, "ARTWORK")
 	bar.absorb:SetTexture(media.absorb)
 	bar.absorb:Hide()
 	-- ... ending in a bright cyan line with a soft glow
-	bar.absorbEdge = bar:CreateTexture(nil, "OVERLAY")
+	bar.absorbEdge = layer:CreateTexture(nil, "OVERLAY")
 	bar.absorbEdge:SetTexture(0.55, 0.95, 1, 1)
 	bar.absorbEdge:SetWidth(2)
 	bar.absorbEdge:Hide()
-	bar.absorbGlow = bar:CreateTexture(nil, "OVERLAY")
+	bar.absorbGlow = layer:CreateTexture(nil, "OVERLAY")
 	bar.absorbGlow:SetTexture(1, 1, 1, 1)
 	bar.absorbGlow:SetGradientAlpha("HORIZONTAL", 0.4, 0.9, 1, 0, 0.4, 0.9, 1, 0.7)
 	bar.absorbGlow:SetWidth(8)
 	bar.absorbGlow:Hide()
 	if hpText then
-		bar.absorbText = ns:CreateText(bar, math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
+		bar.absorbText = ns:CreateText(ns:TextLayer(bar), math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
 		bar.absorbText:SetTextColor(0.8, 0.96, 1)
 		bar.absorbText:SetPoint("RIGHT", hpText, "LEFT", -5, 0)
 		bar.absorbText:Hide()
