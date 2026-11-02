@@ -203,6 +203,10 @@ local function Build()
 		Add(Check(win, m[2], nil, function() return ns.db[m[1]] end, function(v) ns.db[m[1]] = v end))
 	end
 
+	Add(Check(win, "Combat meter", "damage, healing, dispels, interrupts, deaths",
+		function() return ns.db.meter ~= false end,
+		function(v) ns.db.meter = v; if ns.Meter and ns.Meter.Update then ns.Meter:Update() end end))
+
 	y = y + 6
 	Add(Header(win, "LAYOUT AND TOOLS"), 14)
 	local row1 = CreateFrame("Frame", nil, win)
