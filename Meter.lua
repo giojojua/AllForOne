@@ -13,7 +13,7 @@ local _, ns = ...
 local colors = ns.colors
 local GetTime, band = GetTime, bit.band
 
-local ROW_H, ROW_GAP, TITLE_H = 24, 1, 28
+local ROW_H, ROW_GAP, TITLE_H = 20, 1, 28
 local MAX_ROWS = 30
 local HISTORY = 10
 local MINE = (COMBATLOG_OBJECT_AFFILIATION_MINE or 1) + (COMBATLOG_OBJECT_AFFILIATION_PARTY or 2)
@@ -711,9 +711,9 @@ local function Build()
 		row.icon = tl:CreateTexture(nil, "OVERLAY")
 		row.icon:SetSize(ROW_H, ROW_H)
 		row.icon:SetPoint("RIGHT", row, "LEFT", -1, 0)
-		row.value = ns:CreateText(tl, 15, true, "RIGHT")
+		row.value = ns:CreateText(tl, 13, true, "RIGHT")
 		row.value:SetPoint("RIGHT", -5, 0)
-		row.name = ns:CreateText(tl, 15, true, "LEFT")
+		row.name = ns:CreateText(tl, 13, true, "LEFT")
 		row.name:SetPoint("LEFT", 6, 0)
 		row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
 		for _, fs in ipairs({ row.name, row.value }) do
