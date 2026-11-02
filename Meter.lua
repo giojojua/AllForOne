@@ -94,10 +94,11 @@ local function Duration(seg)
 	return math.max(1, (seg.stop or GetTime()) - seg.start)
 end
 
+local known = {} -- guid -> { name, class } for anyone on our side seen in the combat log
 local function Entry(seg, guid)
 	local p = seg.players[guid]
 	if not p then
-		local info = group[guid]
+		local info = group[guid] or known[guid]
 		p = { name = info and info.name or "?", class = info and info.class, guid = guid, spells = {} }
 		seg.players[guid] = p
 	end
@@ -189,10 +190,41 @@ end
 ----------------------------------------------------------------------
 -- Combat log
 ----------------------------------------------------------------------
-local function Source(guid)
+-- Who on our side did it. The combat log's own flags say "you / your party / your raid", so this
+-- works even when the party / raid list isn't ready (or its GUIDs don't match).
+local AFFIL = 0x7            -- mine, party, raid
+local TYPE_PLAYER = COMBATLOG_OBJECT_TYPE_PLAYER or 0x400
+local TYPE_PET = (COMBATLOG_OBJECT_TYPE_PET or 0x1000) + (COMBATLOG_OBJECT_TYPE_GUARDIAN or 0x2000)
+local AFFIL_MINE = COMBATLOG_OBJECT_AFFILIATION_MINE or 1
+local function NameShort(n) return n and n:match("^[^-]+") or n end
+local function Learn(guid, name)
+	if known[guid] or group[guid] then return end
+	local class
+	if GetPlayerInfoByGUID then class = select(2, GetPlayerInfoByGUID(guid)) end
+	known[guid] = { name = NameShort(name) or "?", class = class }
+end
+local function Source(guid, flags, name)
 	if group[guid] then return guid end
 	local o = owner[guid]
-	if o and group[o] then return o end
+	if o and (group[o] or known[o]) then return o end
+	if not flags or band(flags, AFFIL) == 0 then return nil end
+	if band(flags, TYPE_PLAYER) > 0 then
+		Learn(guid, name)
+		return guid
+	end
+	if band(flags, TYPE_PET) > 0 then
+		-- your own pet / guardian: yours. A party / raid pet whose owner we don't know: its own row
+		if band(flags, AFFIL_MINE) > 0 then return UnitGUID("player") end
+		Learn(guid, name)
+		return guid
+	end
+end
+local function Victim(guid, flags, name)
+	if group[guid] then return guid end
+	if flags and band(flags, AFFIL) > 0 and band(flags, TYPE_PLAYER) > 0 then
+		Learn(guid, name)
+		return guid
+	end
 end
 local lastHit = {} -- group guid -> "Spell (Source)" of the last damage taken (for Deaths)
 
@@ -200,12 +232,12 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, src
 	if ns.db.meter == false then return end
 	-- guardians (Feral Spirit, Gargoyle, Treants, Mirror Image...) belong to whoever summoned them
 	if event == "SPELL_SUMMON" then
-		local o = Source(srcGUID)
+		local o = Source(srcGUID, srcFlags, srcName)
 		if o and dstGUID then owner[dstGUID] = o end
 		return
 	end
-	local who = srcFlags and band(srcFlags, MINE) > 0 and Source(srcGUID)
-	local victim = group[dstGUID] and dstGUID
+	local who = Source(srcGUID, srcFlags, srcName)
+	local victim = Victim(dstGUID, dstFlags, dstName)
 
 	if event == "SWING_DAMAGE" or event == "SPELL_DAMAGE" or event == "SPELL_PERIODIC_DAMAGE"
 		or event == "RANGE_DAMAGE" or event == "DAMAGE_SHIELD" then
@@ -484,7 +516,7 @@ end
 
 local function IconButton(parent, texture, tip, onClick)
 	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(18, 18)
+	b:SetSize(16, 16)
 	b.tex = b:CreateTexture(nil, "ARTWORK")
 	b.tex:SetAllPoints(b)
 	b.tex:SetTexture(texture)
@@ -550,7 +582,7 @@ local function Build()
 		if pos then
 			win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
 		else
-			win:SetPoint("TOPLEFT", ns.root, "TOPLEFT", 24, -24)
+			win:SetPoint("TOPLEFT", ns.root, "TOPLEFT", 24, -64)
 		end
 	end
 	Place()
@@ -584,7 +616,7 @@ local function Build()
 		M:ApplyLock()
 		if self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
 	end)
-	lockBtn.tex:SetTexCoord(0, 1, 0, 1)
+	lockBtn.tex:SetTexCoord(0.1, 0.9, 0.1, 0.9)
 	lockBtn:SetPoint("RIGHT", -6, 0)
 	lockBtn:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -593,19 +625,19 @@ local function Build()
 	end)
 	lockBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	win.lockBtn = lockBtn
-	resetBtn:SetPoint("RIGHT", lockBtn, "LEFT", -5, 0)
+	resetBtn:SetPoint("RIGHT", lockBtn, "LEFT", -6, 0)
 	local dispBtn = IconButton(bar, "Interface\\Icons\\Ability_DualWield", "Display: damage, healing, dispels...",
 		function(self) OpenMenu(self, DisplayItems(), function(v) M.display = v; M.scroll = 0; M:Update() end) end)
-	dispBtn:SetPoint("RIGHT", resetBtn, "LEFT", -5, 0)
+	dispBtn:SetPoint("RIGHT", resetBtn, "LEFT", -6, 0)
 	local segBtn = IconButton(bar, "Interface\\Icons\\INV_Misc_PocketWatch_01", "Segment: current, overall, past fights",
 		function(self) OpenMenu(self, SegmentItems(), function(v) M.segment = v; M.scroll = 0; M:Update() end) end)
-	segBtn:SetPoint("RIGHT", dispBtn, "LEFT", -5, 0)
+	segBtn:SetPoint("RIGHT", dispBtn, "LEFT", -6, 0)
 	win.title = ns:CreateText(bar, 16, true, "LEFT")
-	win.title:SetPoint("LEFT", 8, 0)
+	win.title:SetPoint("LEFT", 10, 0)
 	win.title:SetShadowColor(0, 0, 0, 1)
 	win.title:SetShadowOffset(1, -1)
 	win.seg = ns:CreateText(bar, 11, true, "LEFT")
-	win.seg:SetPoint("LEFT", win.title, "RIGHT", 8, -1)
+	win.seg:SetPoint("LEFT", win.title, "RIGHT", 10, 0)
 	win.seg:SetPoint("RIGHT", segBtn, "LEFT", -6, 0)
 	win.seg:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
 	win.clock = win.seg
@@ -686,6 +718,7 @@ local function Build()
 		local locked = ns.db.meterLocked
 		if locked then win.grip:Hide() else win.grip:Show() end
 		-- gold = locked, grey = unlocked
+		if win.lockBtn.tex.SetDesaturated then win.lockBtn.tex:SetDesaturated(true) end
 		if locked then win.lockBtn.tex:SetVertexColor(1, 0.78, 0.3) else win.lockBtn.tex:SetVertexColor(0.55, 0.56, 0.59) end
 	end
 	M:ApplyLock()
