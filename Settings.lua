@@ -203,7 +203,7 @@ local function Build()
 		Add(Check(win, m[2], nil, function() return ns.db[m[1]] end, function(v) ns.db[m[1]] = v end))
 	end
 
-	Add(Check(win, "Damage / healing meter", "click its title: damage / healing · segment: this fight / overall",
+	Add(Check(win, "Damage / healing / dispel meter", "this fight + all time",
 		function() return ns.db.meter ~= false end,
 		function(v) ns.db.meter = v; if ns.Meter and ns.Meter.Update then ns.Meter:Update() end end))
 
