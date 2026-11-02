@@ -477,7 +477,8 @@ function M:Update()
 	local empty = #list == 0
 	win.fill:SetAlpha(empty and 0 or 1)
 	win.frameLine:SetAlpha(empty and 0 or 1)
-	win.barBg:SetAlpha(empty and 0 or 1)
+	-- the title row keeps its dark background either way (on its own it needs to be solid)
+	if empty then win.barBg:SetTexture(0.025, 0.028, 0.032, 0.92) else win.barBg:SetTexture(0, 0, 0, 0.3) end
 	win.empty:Hide()
 end
 
@@ -695,8 +696,12 @@ local function Build()
 		acc = acc + e
 		if acc < 0.5 then return end
 		acc = 0
-		CheckEnd()
-		if dirty or (current.start and not current.stop) then M:Update() end
+		-- errors here would be silent (3.3.5 hides Lua errors by default): report them in chat
+		local ok, err = pcall(function()
+			CheckEnd()
+			if dirty or (current.start and not current.stop) then M:Update() end
+		end)
+		if not ok and err ~= M.lastErr then M.lastErr = err; ns:Report(err) end
 	end)
 	M:Update()
 end
