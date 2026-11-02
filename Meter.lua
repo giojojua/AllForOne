@@ -485,6 +485,28 @@ function M:Update()
 	win.seg:SetText(SegName(seg) .. ((seg.start or seg == overall) and ("  " .. Clock(secs)) or ""))
 	local n = VisibleRows()
 	M.scroll = math.max(0, math.min(M.scroll, #list - n))
+	-- scrollbar: only when there are more players than rows
+	local maxScroll = math.max(0, #list - n)
+	local sb = win.scrollbar
+	if sb then
+		local want = maxScroll > 0
+		if want ~= sb.wanted then
+			sb.wanted = want
+			if want then sb:Show() else sb:Hide() end
+			for _, row in ipairs(win.rows) do
+				row:SetPoint("RIGHT", win, "RIGHT", want and -9 or -2, 0)
+			end
+		end
+		if want then
+			sb.updating = true
+			sb:SetMinMaxValues(0, maxScroll)
+			sb:SetValue(M.scroll)
+			-- thumb size follows how much of the list is visible
+			local h = sb:GetHeight() or 0
+			sb.thumb:SetHeight(math.max(12, h * n / #list))
+			sb.updating = nil
+		end
+	end
 	local top = list[1] and list[1][disp.stat] or 1
 	for i, row in ipairs(win.rows) do
 		local idx = i + M.scroll
@@ -711,6 +733,30 @@ local function Build()
 	win.empty:SetPoint("TOPLEFT", 8, -TITLE_H - 6)
 	win.empty:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
 	win.empty:SetText("no data yet")
+
+	-- slim scrollbar on the right (drag it, or use the mouse wheel)
+	local sb = CreateFrame("Slider", nil, win)
+	sb:SetOrientation("VERTICAL")
+	sb:SetWidth(5)
+	sb:SetPoint("TOPRIGHT", win, "TOPRIGHT", -2, -TITLE_H - 2)
+	sb:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -2, 16)
+	local track = sb:CreateTexture(nil, "BACKGROUND")
+	track:SetAllPoints(sb)
+	track:SetTexture(1, 1, 1, 0.08)
+	sb.thumb = sb:CreateTexture(nil, "OVERLAY")
+	sb.thumb:SetTexture(1, 0.78, 0.3, 0.85)
+	sb.thumb:SetSize(5, 24)
+	sb:SetThumbTexture(sb.thumb)
+	sb:SetValueStep(1)
+	sb:SetMinMaxValues(0, 0)
+	sb:SetValue(0)
+	sb:SetScript("OnValueChanged", function(self, v)
+		if self.updating then return end
+		M.scroll = floor(v + 0.5)
+		M:Update()
+	end)
+	sb:Hide()
+	win.scrollbar = sb
 
 	-- mouse wheel scrolls the rows
 	win:EnableMouseWheel(true)
