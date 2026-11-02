@@ -228,7 +228,13 @@ local function Victim(guid, flags, name)
 end
 local lastHit = {} -- group guid -> "Spell (Source)" of the last damage taken (for Deaths)
 
+-- what the meter has seen (hover the title to read it)
+local stats = { events = 0, counted = 0, skipped = 0, lastSkip = nil, lastEventAt = 0, fixes = 0 }
+M.stats = stats
+
 ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
+	stats.events = stats.events + 1
+	stats.lastEventAt = GetTime()
 	if ns.db.meter == false then return end
 	-- guardians (Feral Spirit, Gargoyle, Treants, Mirror Image...) belong to whoever summoned them
 	if event == "SPELL_SUMMON" then
@@ -250,7 +256,12 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, src
 			spell, amount, overkill, crit = name or "?", a, o, c
 		end
 		local real = (amount or 0) - ((overkill and overkill > 0) and overkill or 0)
+		if not who and not victim and srcName then
+			stats.skipped = stats.skipped + 1
+			stats.lastSkip = format("%s from %s (flags 0x%X)", event, srcName, srcFlags or 0)
+		end
 		if who and not victim then
+			stats.counted = stats.counted + 1
 			Add(who, "damage", real, spell, crit)
 			NoteEnemy(dstName and dstName:match("^[^-]+"), real)
 		end
@@ -601,6 +612,21 @@ local function Build()
 	win.barBg = barBg
 	-- drag the title bar to move the window (while unlocked)
 	bar:EnableMouse(true)
+	-- hover the title: what the meter has received (to find out why something isn't counted)
+	bar:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+		GameTooltip:AddLine("Combat meter")
+		GameTooltip:AddDoubleLine("Combat log events received", stats.events, 0.8, 0.8, 0.8, 1, 1, 1)
+		GameTooltip:AddDoubleLine("Damage hits counted", stats.counted, 0.8, 0.8, 0.8, 1, 1, 1)
+		GameTooltip:AddDoubleLine("Damage hits skipped", stats.skipped, 0.8, 0.8, 0.8, 1, 1, 1)
+		local n = 0
+		for _ in pairs(group) do n = n + 1 end
+		GameTooltip:AddDoubleLine("Group members known", n, 0.8, 0.8, 0.8, 1, 1, 1)
+		GameTooltip:AddDoubleLine("Combat log resets", stats.fixes, 0.8, 0.8, 0.8, 1, 1, 1)
+		if stats.lastSkip then GameTooltip:AddLine("Last skipped: " .. stats.lastSkip, 0.6, 0.6, 0.6, true) end
+		GameTooltip:Show()
+	end)
+	bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	bar:RegisterForDrag("LeftButton")
 	bar:SetScript("OnDragStart", function() if not ns.db.meterLocked then win:StartMoving() end end)
 	bar:SetScript("OnDragStop", function()
@@ -731,6 +757,14 @@ local function Build()
 		acc = 0
 		-- errors here would be silent (3.3.5 hides Lua errors by default): report them in chat
 		local ok, err = pcall(function()
+			-- 3.3.5 bug: the combat log can stop reaching addons; clearing it brings it back
+			-- (the same fix Recount / Skada use)
+			if CombatLogClearEntries and UnitAffectingCombat and UnitAffectingCombat("player")
+				and GetTime() - stats.lastEventAt > 5 and GetTime() - (stats.lastFix or 0) > 5 then
+				stats.lastFix = GetTime()
+				stats.fixes = stats.fixes + 1
+				CombatLogClearEntries()
+			end
 			CheckEnd()
 			if dirty or (current.start and not current.stop) then M:Update() end
 		end)
