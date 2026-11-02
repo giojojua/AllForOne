@@ -1,21 +1,42 @@
--- AllForOne: damage / healing / dispel meter (a small Recount)
+-- AllForOne: combat meter in the style of Details!
 -- Counts you, your party / raid and everyone's pets and guardians (pets add to their owner).
---   modes:    DAMAGE (done), HEALING (done, no overheal), DISPELS (your side removing auras)
---   segments: CURRENT (this fight, or the last one) and ALL TIME (kept between sessions for this
---             character, until you press x while ALL TIME is shown)
--- Hover a bar: that player's top spells (dispels: what they removed).
+--
+-- Title bar:  [segment] [display] [reset]   Damage Done - Current
+--   segment menu: Current, Overall, and the last 10 fights ("vs <enemy>  1:23")
+--   display menu: Damage Done, DPS, Damage Taken, Healing Done, HPS, Overhealing, Dispels,
+--                 Interrupts, Deaths
+-- Rows: class icon, "1. Name", "total (per second, percent)". Mouse wheel scrolls, drag the
+-- bottom-right corner to resize. Hover a row for a quick spell list, click it for the full
+-- breakdown (amount, share, hits, crit %).
+-- Overall is kept between sessions for this character until you reset it.
 local _, ns = ...
 local colors = ns.colors
 local GetTime, band = GetTime, bit.band
 
-local ROWS, ROW_H, W = 8, 20, 250
-local HEAD_H = 42
+local ROW_H, ROW_GAP, TITLE_H = 19, 1, 22
+local MAX_ROWS = 30
+local HISTORY = 10
 local MINE = (COMBATLOG_OBJECT_AFFILIATION_MINE or 1) + (COMBATLOG_OBJECT_AFFILIATION_PARTY or 2)
 	+ (COMBATLOG_OBJECT_AFFILIATION_RAID or 4)
-local MODES = { { key = "damage", label = "DAMAGE" }, { key = "heal", label = "HEALING" }, { key = "dispel", label = "DISPELS" } }
-local SEGS = { { key = "current", label = "CURRENT" }, { key = "all", label = "ALL TIME" } }
+local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 
-local M = { mode = "damage", seg = "current" }
+-- what can be shown: stat = the counter, ps = per-second display, count = plain numbers
+local DISPLAYS = {
+	{ key = "damage", label = "Damage Done", stat = "damage", ps = true },
+	{ key = "dps", label = "DPS", stat = "damage", ps = true, rate = true },
+	{ key = "taken", label = "Damage Taken", stat = "taken", ps = true },
+	{ key = "heal", label = "Healing Done", stat = "heal", ps = true },
+	{ key = "hps", label = "HPS", stat = "heal", ps = true, rate = true },
+	{ key = "overheal", label = "Overhealing", stat = "overheal" },
+	{ key = "dispel", label = "Dispels", stat = "dispel", count = true },
+	{ key = "interrupt", label = "Interrupts", stat = "interrupt", count = true },
+	{ key = "deaths", label = "Deaths", stat = "deaths", count = true },
+}
+local DISPLAY = {}
+for _, d in ipairs(DISPLAYS) do DISPLAY[d.key] = d end
+local STATS = { "damage", "taken", "heal", "overheal", "dispel", "interrupt", "deaths" }
+
+local M = { display = "damage", segment = "current", scroll = 0 }
 ns.Meter = M
 
 ----------------------------------------------------------------------
@@ -43,16 +64,18 @@ M.Roster = Roster
 ----------------------------------------------------------------------
 -- Segments
 ----------------------------------------------------------------------
-local function NewSeg() return { start = nil, stop = nil, time = 0, players = {} } end
-local current, all = NewSeg(), NewSeg()
+local function NewSeg() return { start = nil, stop = nil, time = 0, players = {}, enemies = {} } end
+local current, overall = NewSeg(), NewSeg()
+local history = {}      -- finished fights, newest first
 local lastEvent = 0
 function M.current() return current end
-function M.all() return all end
+function M.overall() return overall end
+function M.history() return history end
 
 local function Duration(seg)
-	if seg == all then
+	if seg == overall then
 		local live = (current.start and not current.stop) and (GetTime() - current.start) or 0
-		return math.max(1, (all.time or 0) + live)
+		return math.max(1, (overall.time or 0) + live)
 	end
 	if not seg.start then return 1 end
 	return math.max(1, (seg.stop or GetTime()) - seg.start)
@@ -60,37 +83,58 @@ end
 
 local function Entry(seg, guid)
 	local p = seg.players[guid]
-	local info = group[guid]
 	if not p then
-		p = { name = info and info.name or "?", class = info and info.class, damage = 0, heal = 0, dispel = 0,
-			spells = { damage = {}, heal = {}, dispel = {} } }
+		local info = group[guid]
+		p = { name = info and info.name or "?", class = info and info.class, spells = {} }
 		seg.players[guid] = p
 	end
-	-- saved data from older versions
-	p.dispel = p.dispel or 0
-	p.spells.dispel = p.spells.dispel or {}
+	for _, s in ipairs(STATS) do
+		p[s] = p[s] or 0
+		p.spells[s] = p.spells[s] or {}
+	end
 	return p
 end
 
 local dirty = false
-local function Add(guid, kind, amount, spell)
-	if not amount or amount <= 0 then return end
+local function Begin()
 	local now = GetTime()
 	if not current.start or current.stop then
-		if current.stop then current = NewSeg() end -- a new fight: the old one is done
+		if current.stop then
+			-- the last fight goes into the history list
+			table.insert(history, 1, current)
+			while #history > HISTORY do table.remove(history) end
+			current = NewSeg()
+		end
 		current.start = now
 	end
 	lastEvent = now
-	for _, seg in ipairs({ current, all }) do
+end
+
+-- amount: what's added; spell: name for the breakdown; crit: counts toward crit %
+local function Add(guid, stat, amount, spell, crit, isHit)
+	if not amount or amount <= 0 then return end
+	Begin()
+	for _, seg in ipairs({ current, overall }) do
 		local p = Entry(seg, guid)
-		p[kind] = p[kind] + amount
-		local s = p.spells[kind]
-		s[spell] = (s[spell] or 0) + amount
+		p[stat] = p[stat] + amount
+		local s = p.spells[stat][spell]
+		if not s then
+			s = { amount = 0, hits = 0, crits = 0 }
+			p.spells[stat][spell] = s
+		end
+		s.amount = s.amount + amount
+		if isHit ~= false then s.hits = s.hits + 1 end
+		if crit then s.crits = s.crits + 1 end
 	end
 	dirty = true
 end
 
--- the fight is over when nobody in the party is in combat and nothing happened for 3 seconds
+local function NoteEnemy(name, amount)
+	if not name or not amount or amount <= 0 then return end
+	current.enemies[name] = (current.enemies[name] or 0) + amount
+end
+
+-- a fight is over when nobody in the party is in combat and nothing happened for 3 seconds
 local function CheckEnd()
 	if not current.start or current.stop then return end
 	if GetTime() - lastEvent < 3 then return end
@@ -99,19 +143,32 @@ local function CheckEnd()
 		if UnitAffectingCombat and UnitExists("party" .. i) and UnitAffectingCombat("party" .. i) then return end
 	end
 	current.stop = lastEvent
-	all.time = (all.time or 0) + (current.stop - current.start)
+	overall.time = (overall.time or 0) + (current.stop - current.start)
 	dirty = true
 end
 
--- x resets the segment you're looking at
-function M:Reset(which)
-	which = which or M.seg
-	if which == "all" then
-		wipe(all.players)
-		all.time = 0
-	else
-		current = NewSeg()
+local function SegName(seg)
+	if seg == overall then return "Overall" end
+	if seg == current then return "Current" end
+	local best, bestV
+	for name, v in pairs(seg.enemies or {}) do
+		if not bestV or v > bestV then best, bestV = name, v end
 	end
+	return best and ("vs " .. best) or "Fight"
+end
+
+function M:Shown()
+	if M.segment == "overall" then return overall end
+	if M.segment == "current" then return current end
+	return history[M.segment] or current
+end
+
+function M:Reset()
+	current, overall = NewSeg(), NewSeg()
+	wipe(history)
+	if ns.db.meterOverall and M.key then ns.db.meterOverall[M.key] = overall end
+	M.segment = "current"
+	M.scroll = 0
 	dirty = true
 	if M.Update then M:Update() end
 end
@@ -119,11 +176,12 @@ end
 ----------------------------------------------------------------------
 -- Combat log
 ----------------------------------------------------------------------
-local function Source(srcGUID)
-	if group[srcGUID] then return srcGUID end
-	local o = owner[srcGUID]
+local function Source(guid)
+	if group[guid] then return guid end
+	local o = owner[guid]
 	if o and group[o] then return o end
 end
+local lastHit = {} -- group guid -> "Spell (Source)" of the last damage taken (for Deaths)
 
 ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, srcFlags, dstGUID, dstName, dstFlags, ...)
 	if ns.db.meter == false then return end
@@ -133,24 +191,42 @@ ns:On("COMBAT_LOG_EVENT_UNFILTERED", function(_, _, event, srcGUID, srcName, src
 		if o and dstGUID then owner[dstGUID] = o end
 		return
 	end
-	if not srcFlags or band(srcFlags, MINE) == 0 then return end
-	local who = Source(srcGUID)
-	if not who then return end
-	if event == "SWING_DAMAGE" then
-		if group[dstGUID] then return end -- no friendly fire
-		local amount, overkill = ...
-		Add(who, "damage", (amount or 0) - ((overkill and overkill > 0) and overkill or 0), MELEE or "Melee")
-	elseif event == "SPELL_DAMAGE" or event == "SPELL_PERIODIC_DAMAGE" or event == "RANGE_DAMAGE" or event == "DAMAGE_SHIELD" then
-		if group[dstGUID] then return end
-		local _, spellName, _, amount, overkill = ...
-		Add(who, "damage", (amount or 0) - ((overkill and overkill > 0) and overkill or 0), spellName or "?")
-	elseif event == "SPELL_HEAL" or event == "SPELL_PERIODIC_HEAL" then
-		local _, spellName, _, amount, over = ...
-		Add(who, "heal", (amount or 0) - (over or 0), spellName or "?")
-	elseif event == "SPELL_DISPEL" or event == "SPELL_STOLEN" then
-		-- what was removed: Polymorph, Power Word: Shield, Fear...
+	local who = srcFlags and band(srcFlags, MINE) > 0 and Source(srcGUID)
+	local victim = group[dstGUID] and dstGUID
+
+	if event == "SWING_DAMAGE" or event == "SPELL_DAMAGE" or event == "SPELL_PERIODIC_DAMAGE"
+		or event == "RANGE_DAMAGE" or event == "DAMAGE_SHIELD" then
+		local spell, amount, overkill, crit
+		if event == "SWING_DAMAGE" then
+			local a, o, _, _, _, _, c = ...
+			spell, amount, overkill, crit = MELEE or "Melee", a, o, c
+		else
+			local _, name, _, a, o, _, _, _, _, c = ...
+			spell, amount, overkill, crit = name or "?", a, o, c
+		end
+		local real = (amount or 0) - ((overkill and overkill > 0) and overkill or 0)
+		if who and not victim then
+			Add(who, "damage", real, spell, crit)
+			NoteEnemy(dstName and dstName:match("^[^-]+"), real)
+		end
+		if victim then
+			Add(victim, "taken", amount or 0, spell .. " (" .. ((srcName and srcName:match("^[^-]+")) or "?") .. ")", crit)
+			lastHit[victim] = spell .. " (" .. ((srcName and srcName:match("^[^-]+")) or "?") .. ")"
+		end
+	elseif (event == "SPELL_HEAL" or event == "SPELL_PERIODIC_HEAL") and who then
+		local _, name, _, amount, over, _, crit = ...
+		amount, over = amount or 0, over or 0
+		Add(who, "heal", amount - over, name or "?", crit)
+		if over > 0 then Add(who, "overheal", over, name or "?", nil) end
+	elseif (event == "SPELL_DISPEL" or event == "SPELL_STOLEN") and who then
 		local _, _, _, _, removed = ...
 		Add(who, "dispel", 1, removed or "?")
+	elseif event == "SPELL_INTERRUPT" and who then
+		local _, _, _, _, stopped = ...
+		Add(who, "interrupt", 1, stopped or "?")
+	elseif event == "UNIT_DIED" and victim then
+		Add(victim, "deaths", 1, lastHit[victim] or "?")
+		lastHit[victim] = nil
 	end
 end)
 
@@ -159,47 +235,186 @@ for _, ev in ipairs({ "PARTY_MEMBERS_CHANGED", "RAID_ROSTER_UPDATE", "UNIT_PET",
 end
 
 ----------------------------------------------------------------------
--- Window
+-- Formatting
 ----------------------------------------------------------------------
 local function Short(n)
-	if n >= 1e6 then return format("%.2fm", n / 1e6) end
-	if n >= 1e4 then return format("%.1fk", n / 1e3) end
+	if n >= 1e6 then return format("%.2fM", n / 1e6) end
+	if n >= 1e3 then return format("%.1fK", n / 1e3) end
 	return tostring(floor(n + 0.5))
 end
 local function Clock(s)
 	s = floor(s)
-	if s >= 3600 then return format("%d:%02d:%02d", floor(s / 3600), floor(s / 60) % 60, s % 60) end
 	return format("%d:%02d", floor(s / 60), s % 60)
 end
 
-local win
-local function Shown() return (M.seg == "all") and all or current end
-local function Sorted()
-	local seg = Shown()
-	local list = {}
+-- sorted players for the display, and the segment's total for it
+local function Ranking(seg, disp)
+	local list, total = {}, 0
+	local secs = Duration(seg)
 	for _, p in pairs(seg.players) do
-		if (p[M.mode] or 0) > 0 then list[#list + 1] = p end
+		local v = p[disp.stat] or 0
+		if v > 0 then
+			list[#list + 1] = p
+			total = total + v
+		end
 	end
-	ns:Sort(list, function(a, b) return a[M.mode] > b[M.mode] end)
-	return list, seg
+	ns:Sort(list, function(a, b) return a[disp.stat] > b[disp.stat] end)
+	return list, total, secs
 end
+
+local function RowText(p, disp, total, secs)
+	local v = p[disp.stat]
+	local pct = total > 0 and (v / total * 100) or 0
+	if disp.count then return format("%d (%.1f%%)", v, pct) end
+	if disp.rate then return format("%s (%s, %.1f%%)", Short(v / secs), Short(v), pct) end
+	return format("%s (%s, %.1f%%)", Short(v), Short(v / secs), pct)
+end
+
+----------------------------------------------------------------------
+-- Small menus (our own, no Blizzard dropdowns)
+----------------------------------------------------------------------
+local menu
+local function OpenMenu(anchor, items, onPick)
+	if not menu then
+		menu = CreateFrame("Frame", "AllForOneMeterMenu", UIParent)
+		menu:SetFrameStrata("DIALOG")
+		ns:Skin(menu)
+		menu.fill:SetTexture(0.05, 0.055, 0.065, 0.97)
+		menu.buttons = {}
+		menu:EnableMouse(true)
+		tinsert(UISpecialFrames, "AllForOneMeterMenu")
+	end
+	for _, b in ipairs(menu.buttons) do b:Hide() end
+	local w = 140
+	for i, it in ipairs(items) do
+		local b = menu.buttons[i]
+		if not b then
+			b = CreateFrame("Button", nil, menu)
+			b:SetHeight(18)
+			b.hl = b:CreateTexture(nil, "BACKGROUND")
+			b.hl:SetAllPoints(b)
+			b.hl:SetTexture(1, 1, 1, 0.08)
+			b.hl:Hide()
+			b.text = ns:CreateText(b, 12, true, "LEFT")
+			b.text:SetPoint("LEFT", 8, 0)
+			b.right = ns:CreateText(b, 11, false, "RIGHT")
+			b.right:SetPoint("RIGHT", -8, 0)
+			b:SetScript("OnEnter", function(self) self.hl:Show() end)
+			b:SetScript("OnLeave", function(self) self.hl:Hide() end)
+			menu.buttons[i] = b
+		end
+		b:ClearAllPoints()
+		b:SetPoint("TOPLEFT", 2, -2 - (i - 1) * 18)
+		b:SetPoint("RIGHT", menu, "RIGHT", -2, 0)
+		b.text:SetText(it.label)
+		b.text:SetTextColor(it.active and 1 or 0.85, it.active and 0.82 or 0.85, it.active and 0.3 or 0.85)
+		b.right:SetText(it.right or "")
+		b.right:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+		b:SetScript("OnClick", function() menu:Hide(); onPick(it.value) end)
+		b:Show()
+		w = math.max(w, b.text:GetStringWidth() + b.right:GetStringWidth() + 36)
+	end
+	menu:SetSize(w, #items * 18 + 4)
+	menu:ClearAllPoints()
+	menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+	menu:Show()
+end
+
+----------------------------------------------------------------------
+-- Breakdown window (click a row)
+----------------------------------------------------------------------
+local breakdown
+local function ShowBreakdown(p, disp)
+	if not breakdown then
+		breakdown = CreateFrame("Frame", "AllForOneMeterBreakdown", UIParent)
+		breakdown:SetFrameStrata("DIALOG")
+		breakdown:SetSize(420, 300)
+		breakdown:SetPoint("CENTER")
+		ns:Skin(breakdown)
+		breakdown.fill:SetTexture(0.04, 0.045, 0.055, 0.96)
+		breakdown:EnableMouse(true)
+		breakdown:SetMovable(true)
+		breakdown:RegisterForDrag("LeftButton")
+		breakdown:SetScript("OnDragStart", breakdown.StartMoving)
+		breakdown:SetScript("OnDragStop", breakdown.StopMovingOrSizing)
+		tinsert(UISpecialFrames, "AllForOneMeterBreakdown")
+		breakdown.title = ns:CreateText(breakdown, 15, true, "LEFT")
+		breakdown.title:SetPoint("TOPLEFT", 10, -8)
+		local close = CreateFrame("Button", nil, breakdown, "UIPanelCloseButton")
+		close:SetPoint("TOPRIGHT", 2, 2)
+		local head = { { "SPELL", 10, "LEFT" }, { "AMOUNT", 250, "RIGHT" }, { "%", 300, "RIGHT" }, { "HITS", 350, "RIGHT" }, { "CRIT", 404, "RIGHT" } }
+		for _, h in ipairs(head) do
+			local t = ns:CreateText(breakdown, 11, true, h[3])
+			t:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+			if h[3] == "LEFT" then t:SetPoint("TOPLEFT", h[2], -32) else t:SetPoint("TOPRIGHT", breakdown, "TOPLEFT", h[2], -32) end
+			t:SetText(h[1])
+		end
+		breakdown.lines = {}
+		for i = 1, 12 do
+			local l = ns:CreateBar(breakdown, 400, 18)
+			l:SetPoint("TOPLEFT", 10, -48 - (i - 1) * 20)
+			local tl = CreateFrame("Frame", nil, l)
+			tl:SetAllPoints(l)
+			tl:SetFrameLevel(l:GetFrameLevel() + 3)
+			l.cols = {}
+			for c, h in ipairs(head) do
+				local t = ns:CreateText(tl, 12, true, h[3])
+				if h[3] == "LEFT" then t:SetPoint("LEFT", 4, 0) else t:SetPoint("RIGHT", l, "LEFT", h[2] - 10, 0) end
+				l.cols[c] = t
+			end
+			breakdown.lines[i] = l
+		end
+	end
+	local spells, total = {}, p[disp.stat] or 0
+	for name, s in pairs(p.spells[disp.stat] or {}) do spells[#spells + 1] = { name = name, s = s } end
+	ns:Sort(spells, function(a, b) return a.s.amount > b.s.amount end)
+	breakdown.title:SetText(p.name .. "  |cff8b8f96" .. disp.label .. " - " .. SegName(M:Shown()) .. "|r")
+	breakdown.title:SetTextColor(ns:ClassColor(p.class))
+	local r, g, b = ns:ClassColor(p.class)
+	for i, l in ipairs(breakdown.lines) do
+		local e = spells[i]
+		if e then
+			l:SetMinMaxValues(0, spells[1].s.amount)
+			l:SetValue(e.s.amount)
+			l:SetStatusBarColor(r * 0.55, g * 0.55, b * 0.55)
+			l.cols[1]:SetText(e.name)
+			l.cols[2]:SetText(disp.count and tostring(e.s.amount) or Short(e.s.amount))
+			l.cols[3]:SetText(total > 0 and format("%.1f%%", e.s.amount / total * 100) or "")
+			l.cols[4]:SetText(disp.count and "" or tostring(e.s.hits))
+			l.cols[5]:SetText((not disp.count and e.s.hits > 0) and format("%.0f%%", e.s.crits / e.s.hits * 100) or "")
+			l:Show()
+		else
+			l:Hide()
+		end
+	end
+	breakdown:SetHeight(56 + math.max(1, math.min(12, #spells)) * 20)
+	breakdown:Show()
+end
+
+----------------------------------------------------------------------
+-- Main window
+----------------------------------------------------------------------
+local win
 
 local function RowTooltip(row)
 	local p = row.player
 	if not p then return end
+	local disp = DISPLAY[M.display]
 	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
 	GameTooltip:AddLine(p.name, ns:ClassColor(p.class))
-	local spells = {}
-	for name, v in pairs(p.spells[M.mode] or {}) do spells[#spells + 1] = { name = name, v = v } end
+	local spells, total = {}, p[disp.stat]
+	for name, s in pairs(p.spells[disp.stat] or {}) do spells[#spells + 1] = { name = name, v = s.amount } end
 	ns:Sort(spells, function(a, b) return a.v > b.v end)
-	local total = p[M.mode]
-	if M.mode == "dispel" then GameTooltip:AddLine("Removed:", 0.55, 0.56, 0.59) end
 	for i = 1, math.min(8, #spells) do
 		local s = spells[i]
-		local right = (M.mode == "dispel") and ("x" .. s.v) or format("%s  %d%%", Short(s.v), floor(s.v / total * 100 + 0.5))
-		GameTooltip:AddDoubleLine(s.name, right, 1, 1, 1, 0.85, 0.85, 0.85)
+		GameTooltip:AddDoubleLine(s.name, format("%s (%.1f%%)", disp.count and tostring(s.v) or Short(s.v), s.v / total * 100), 1, 1, 1, 0.85, 0.85, 0.85)
 	end
+	GameTooltip:AddLine("Click for the full breakdown", 0.55, 0.56, 0.59)
 	GameTooltip:Show()
+end
+
+local function VisibleRows()
+	return math.max(1, math.min(MAX_ROWS, floor((win:GetHeight() - TITLE_H - 2) / (ROW_H + ROW_GAP))))
 end
 
 function M:Update()
@@ -207,134 +422,135 @@ function M:Update()
 	if ns.db.meter == false then win:Hide() return end
 	win:Show()
 	dirty = false
-	for _, t in ipairs(win.modeTabs) do t:SetActive(t.key == M.mode) end
-	for _, t in ipairs(win.segTabs) do t:SetActive(t.key == M.seg) end
-	local list, seg = Sorted()
-	local secs = Duration(seg)
-	win.clock:SetText((seg.start or seg == all) and Clock(secs) or "")
-	local top = list[1] and list[1][M.mode] or 1
-	local shown = 0
+	local disp = DISPLAY[M.display] or DISPLAYS[1]
+	local seg = M:Shown()
+	local list, total, secs = Ranking(seg, disp)
+	win.title:SetText(disp.label .. " |cff8b8f96- " .. SegName(seg) .. "|r")
+	win.clock:SetText((seg.start or seg == overall) and Clock(secs) or "")
+	local n = VisibleRows()
+	M.scroll = math.max(0, math.min(M.scroll, #list - n))
+	local top = list[1] and list[1][disp.stat] or 1
 	for i, row in ipairs(win.rows) do
-		local p = list[i]
+		local idx = i + M.scroll
+		local p = (i <= n) and list[idx] or nil
 		row.player = p
 		if p then
-			shown = i
-			local v = p[M.mode]
 			row:SetMinMaxValues(0, top)
-			row:SetValue(v)
-			-- darker class color: white text stays readable on every class (even priests)
+			row:SetValue(p[disp.stat])
 			local r, g, b = ns:ClassColor(p.class)
-			row:SetStatusBarColor(r * 0.62, g * 0.62, b * 0.62)
-			row.name:SetText(i .. ". " .. (p.name or "?"))
-			if M.mode == "dispel" then
-				row.value:SetText(tostring(v))
+			row:SetStatusBarColor(r * 0.78, g * 0.78, b * 0.78)
+			local coords = p.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[p.class]
+			if coords then
+				row.icon:SetTexture(CLASS_TEX)
+				row.icon:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 			else
-				row.value:SetText(format("%s |cffb4b8bf(%s)|r", Short(v), Short(v / secs)))
+				row.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+				row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 			end
+			row.name:SetText(idx .. ". " .. (p.name or "?"))
+			row.value:SetText(RowText(p, disp, total, secs))
 			row:Show()
 		else
 			row:Hide()
 		end
 	end
-	if shown == 0 then win.empty:Show() else win.empty:Hide() end
-	win:SetHeight(HEAD_H + math.max(1, shown) * (ROW_H + 1) + 3)
+	if #list == 0 then win.empty:Show() else win.empty:Hide() end
 end
 
-local function Tab(parent, label, key, onClick)
+local function IconButton(parent, texture, tip, onClick)
 	local b = CreateFrame("Button", nil, parent)
-	b.key = key
-	b.text = ns:CreateText(b, 13, true, "LEFT")
-	b.text:SetPoint("LEFT", 0, 0)
-	b.text:SetText(label)
-	b:SetSize(b.text:GetStringWidth() + 4, 18)
-	b.line = b:CreateTexture(nil, "ARTWORK")
-	b.line:SetTexture(1, 0.82, 0.3, 1)
-	b.line:SetHeight(2)
-	b.line:SetPoint("BOTTOMLEFT", 0, -1)
-	b.line:SetPoint("BOTTOMRIGHT", -4, -1)
-	function b:SetActive(on)
-		self.active = on
-		if on then
-			self.text:SetTextColor(1, 1, 1)
-			self.line:Show()
-		else
-			self.text:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-			self.line:Hide()
-		end
-	end
+	b:SetSize(16, 16)
+	b.tex = b:CreateTexture(nil, "ARTWORK")
+	b.tex:SetAllPoints(b)
+	b.tex:SetTexture(texture)
+	b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	b.tex:SetVertexColor(0.8, 0.8, 0.8)
 	b:SetScript("OnClick", onClick)
-	b:SetScript("OnEnter", function(self) if not self.active then self.text:SetTextColor(0.85, 0.85, 0.85) end end)
-	b:SetScript("OnLeave", function(self) self:SetActive(self.active) end)
+	b:SetScript("OnEnter", function(self)
+		self.tex:SetVertexColor(1, 1, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine(tip)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function(self) self.tex:SetVertexColor(0.8, 0.8, 0.8); GameTooltip:Hide() end)
 	return b
 end
 
+local function SegmentItems()
+	local items = {
+		{ label = "Current", value = "current", active = M.segment == "current", right = current.start and Clock(Duration(current)) or "" },
+		{ label = "Overall", value = "overall", active = M.segment == "overall", right = Clock(Duration(overall)) },
+	}
+	for i, seg in ipairs(history) do
+		items[#items + 1] = { label = "#" .. i .. "  " .. SegName(seg), value = i, active = M.segment == i, right = Clock(Duration(seg)) }
+	end
+	return items
+end
+
+local function DisplayItems()
+	local items = {}
+	for _, d in ipairs(DISPLAYS) do items[#items + 1] = { label = d.label, value = d.key, active = M.display == d.key } end
+	return items
+end
+
 local function Build()
-	-- ALL TIME is kept for this character between sessions
-	ns.db.meterAll = ns.db.meterAll or {}
-	local key = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
-	ns.db.meterAll[key] = ns.db.meterAll[key] or NewSeg()
-	all = ns.db.meterAll[key]
-	all.players = all.players or {}
-	all.start, all.stop = nil, nil
+	-- Overall is kept for this character between sessions
+	ns.db.meterOverall = ns.db.meterOverall or {}
+	M.key = (UnitName("player") or "?") .. "-" .. (GetRealmName and GetRealmName() or "?")
+	ns.db.meterOverall[M.key] = ns.db.meterOverall[M.key] or NewSeg()
+	overall = ns.db.meterOverall[M.key]
+	overall.players = overall.players or {}
+	overall.enemies = overall.enemies or {}
+	overall.start, overall.stop = nil, nil
+	ns.db.meterAll = nil -- older version's data
 
 	win = CreateFrame("Frame", "AllForOneMeter", ns.root)
-	win:SetSize(W, HEAD_H + ROW_H + 4)
+	win:SetSize(ns.db.meterW or 260, ns.db.meterH or (TITLE_H + 8 * (ROW_H + ROW_GAP) + 2))
 	ns:Skin(win)
-	win.fill:SetTexture(0.03, 0.035, 0.043, 0.85)
-	-- top-left corner of the screen; it grows downward as players appear (max 8 rows)
+	win.fill:SetTexture(0.03, 0.035, 0.043, 0.82)
+	-- top-left corner of the screen
 	ns:Mover("meter", "DAMAGE METER", win, "TOPLEFT", "TOPLEFT", 24, -24)
 
-	-- header line 1: DAMAGE  HEALING  DISPELS                x
-	-- header line 2: CURRENT  ALL TIME                     3:42
-	win.modeTabs, win.segTabs = {}, {}
-	local prev
-	for _, m in ipairs(MODES) do
-		local t = Tab(win, m.label, m.key, function() M.mode = m.key; M:Update() end)
-		if prev then t:SetPoint("LEFT", prev, "RIGHT", 10, 0) else t:SetPoint("TOPLEFT", 7, -3) end
-		win.modeTabs[#win.modeTabs + 1] = t
-		prev = t
-	end
-	prev = nil
-	for _, s in ipairs(SEGS) do
-		local t = Tab(win, s.label, s.key, function() M.seg = s.key; M:Update() end)
-		if prev then t:SetPoint("LEFT", prev, "RIGHT", 10, 0) else t:SetPoint("TOPLEFT", 7, -22) end
-		win.segTabs[#win.segTabs + 1] = t
-		prev = t
-	end
-	local reset = CreateFrame("Button", nil, win)
-	reset:SetSize(18, 18)
-	reset:SetPoint("TOPRIGHT", -3, -3)
-	reset.text = ns:CreateText(reset, 14, true, "CENTER")
-	reset.text:SetPoint("CENTER", 0, 0)
-	reset.text:SetText("x")
-	reset.text:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	reset:SetScript("OnClick", function() M:Reset() end)
-	reset:SetScript("OnEnter", function(self)
-		self.text:SetTextColor(1, 0.35, 0.35)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:AddLine(M.seg == "all" and "Reset ALL TIME" or "Reset this fight")
-		GameTooltip:Show()
-	end)
-	reset:SetScript("OnLeave", function(self)
-		self.text:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-		GameTooltip:Hide()
-	end)
-	win.clock = ns:CreateText(win, 12, true, "RIGHT")
-	win.clock:SetPoint("TOPRIGHT", -6, -24)
+	-- title bar
+	local bar = CreateFrame("Frame", nil, win)
+	bar:SetPoint("TOPLEFT", 0, 0)
+	bar:SetPoint("TOPRIGHT", 0, 0)
+	bar:SetHeight(TITLE_H)
+	local barBg = bar:CreateTexture(nil, "BACKGROUND")
+	barBg:SetAllPoints(bar)
+	barBg:SetTexture(0, 0, 0, 0.55)
+	local segBtn = IconButton(bar, "Interface\\Icons\\INV_Misc_PocketWatch_01", "Segment: current, overall, past fights",
+		function(self) OpenMenu(self, SegmentItems(), function(v) M.segment = v; M.scroll = 0; M:Update() end) end)
+	segBtn:SetPoint("LEFT", 4, 0)
+	local dispBtn = IconButton(bar, "Interface\\Icons\\Ability_DualWield", "Display: damage, healing, dispels...",
+		function(self) OpenMenu(self, DisplayItems(), function(v) M.display = v; M.scroll = 0; M:Update() end) end)
+	dispBtn:SetPoint("LEFT", segBtn, "RIGHT", 4, 0)
+	local resetBtn = IconButton(bar, "Interface\\Icons\\Spell_Shadow_SacrificialShield", "Reset all data", function() M:Reset() end)
+	resetBtn:SetPoint("LEFT", dispBtn, "RIGHT", 4, 0)
+	win.title = ns:CreateText(bar, 12, true, "LEFT")
+	win.title:SetPoint("LEFT", resetBtn, "RIGHT", 7, 0)
+	win.clock = ns:CreateText(bar, 11, true, "RIGHT")
+	win.clock:SetPoint("RIGHT", -6, 0)
 	win.clock:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+	win.title:SetPoint("RIGHT", win.clock, "LEFT", -4, 0)
 
+	-- rows
 	win.rows = {}
-	for i = 1, ROWS do
-		local row = ns:CreateBar(win, W - 6, ROW_H)
-		row:SetPoint("TOPLEFT", 3, -HEAD_H - (i - 1) * (ROW_H + 1))
-		-- text on its own layer above the bar's shine, so the shine never washes it out
-		local textLayer = CreateFrame("Frame", nil, row)
-		textLayer:SetAllPoints(row)
-		textLayer:SetFrameLevel(row:GetFrameLevel() + 3)
-		row.value = ns:CreateText(textLayer, 13, true, "RIGHT")
-		row.value:SetPoint("RIGHT", -5, 0)
-		row.name = ns:CreateText(textLayer, 13, true, "LEFT")
-		row.name:SetPoint("LEFT", 5, 0)
+	for i = 1, MAX_ROWS do
+		local row = ns:CreateBar(win, 10, ROW_H)
+		row:SetPoint("TOPLEFT", 1, -TITLE_H - 1 - (i - 1) * (ROW_H + ROW_GAP))
+		row:SetPoint("RIGHT", win, "RIGHT", -1, 0)
+		-- text on its own layer above the bar's shine
+		local tl = CreateFrame("Frame", nil, row)
+		tl:SetAllPoints(row)
+		tl:SetFrameLevel(row:GetFrameLevel() + 3)
+		row.icon = tl:CreateTexture(nil, "OVERLAY")
+		row.icon:SetSize(ROW_H, ROW_H)
+		row.icon:SetPoint("LEFT", 0, 0)
+		row.value = ns:CreateText(tl, 12, true, "RIGHT")
+		row.value:SetPoint("RIGHT", -4, 0)
+		row.name = ns:CreateText(tl, 12, true, "LEFT")
+		row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
 		row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
 		for _, fs in ipairs({ row.name, row.value }) do
 			fs:SetShadowColor(0, 0, 0, 1)
@@ -343,15 +559,44 @@ local function Build()
 		row:EnableMouse(true)
 		row:SetScript("OnEnter", RowTooltip)
 		row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		row:SetScript("OnMouseUp", function(self, button)
+			if button == "LeftButton" and self.player then ShowBreakdown(self.player, DISPLAY[M.display]) end
+		end)
 		row:Hide()
 		win.rows[i] = row
 	end
 	win.empty = ns:CreateText(win, 12, false, "LEFT")
-	win.empty:SetPoint("TOPLEFT", 8, -HEAD_H - 4)
+	win.empty:SetPoint("TOPLEFT", 8, -TITLE_H - 6)
 	win.empty:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	win.empty:SetText("nothing yet")
+	win.empty:SetText("no data yet")
 
-	-- refresh twice a second when something changed (and while a fight runs: the per-second numbers move)
+	-- mouse wheel scrolls the rows
+	win:EnableMouseWheel(true)
+	win:SetScript("OnMouseWheel", function(_, delta)
+		M.scroll = math.max(0, M.scroll - delta)
+		M:Update()
+	end)
+
+	-- drag the bottom-right corner to resize
+	win:SetResizable(true)
+	win:SetMinResize(180, TITLE_H + 2 * (ROW_H + ROW_GAP) + 2)
+	win:SetMaxResize(500, TITLE_H + MAX_ROWS * (ROW_H + ROW_GAP) + 2)
+	local grip = CreateFrame("Button", nil, win)
+	grip:SetSize(14, 14)
+	grip:SetPoint("BOTTOMRIGHT", 0, 0)
+	grip:SetFrameLevel(win:GetFrameLevel() + 10)
+	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+	grip:SetScript("OnMouseDown", function() win:StartSizing("BOTTOMRIGHT") end)
+	grip:SetScript("OnMouseUp", function()
+		win:StopMovingOrSizing()
+		ns.db.meterW, ns.db.meterH = floor(win:GetWidth() + 0.5), floor(win:GetHeight() + 0.5)
+		M:Update()
+	end)
+	win:SetScript("OnSizeChanged", function() M:Update() end)
+
+	-- refresh twice a second when something changed (and while a fight runs)
 	local acc = 0
 	win:SetScript("OnUpdate", function(_, e)
 		acc = acc + e
