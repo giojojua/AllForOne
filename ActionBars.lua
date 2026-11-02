@@ -479,6 +479,42 @@ local function Build()
 	end)
 	Step(Reanchor)
 
+	-- 5. vehicles (Isle of Conquest glaive throwers, siege engines, Wintergrasp...).
+	-- Blizzard shows its vehicle bar (with the Leave button) from the end of the main bar's
+	-- slide-out, and that code can be blocked in combat once the main bar is ours - so the
+	-- vehicle bar never appeared. A secure state driver shows it whenever the game says you have
+	-- a vehicle UI, in or out of combat (our bars hide at the same moment).
+	Step(function()
+		if VehicleMenuBar and RegisterStateDriver then
+			RegisterStateDriver(VehicleMenuBar, "visibility", "[vehicleui] show; hide")
+		end
+		-- its artwork / button layout: put it on if Blizzard's call didn't get through
+		local function Skin()
+			if UnitHasVehicleUI and UnitHasVehicleUI("player") and VehicleMenuBar_SetSkin and VehicleMenuBar
+				and VehicleMenuBar.skin and VehicleMenuBar.currSkin ~= VehicleMenuBar.skin then
+				VehicleMenuBar_SetSkin(VehicleMenuBar.skin, IsVehicleAimAngleAdjustable and IsVehicleAimAngleAdjustable())
+			end
+		end
+		ns:On("UNIT_ENTERED_VEHICLE", function(_, unit)
+			if unit == "player" then ns:SafeCall(Skin) end
+		end)
+		-- vehicles without the vehicle bar use the normal bar + Blizzard's small Leave button,
+		-- which lived inside the (hidden) default bar: move it next to action bar 1
+		local leave = MainMenuBarVehicleLeaveButton
+		if leave then
+			leave:SetParent(main)
+			local function Place()
+				if CanExitVehicle and CanExitVehicle() then
+					leave:ClearAllPoints()
+					leave:SetPoint("LEFT", main, "RIGHT", 8, 0)
+					leave:Show()
+				end
+			end
+			if MainMenuBarVehicleLeaveButton_Update then hooksecurefunc("MainMenuBarVehicleLeaveButton_Update", Place) end
+			Place()
+		end
+	end)
+
 	-- 5. short keybind labels
 	Step(function()
 		hooksecurefunc("ActionButton_UpdateHotkeys", function(self)
