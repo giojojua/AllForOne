@@ -217,7 +217,8 @@ local function Build()
 	win:SetSize(W, 22 + ROW_H + 4)
 	ns:Skin(win)
 	win.fill:SetTexture(0.03, 0.035, 0.043, 0.8)
-	ns:Mover("meter", "DAMAGE METER", win, "BOTTOMRIGHT", "BOTTOMRIGHT", -114, 96)
+	-- top-left corner of the screen; it grows downward as players appear (max 8 rows)
+	ns:Mover("meter", "DAMAGE METER", win, "TOPLEFT", "TOPLEFT", 24, -24)
 
 	-- header: [DAMAGE] [CURRENT] ............ [x]
 	local function HeaderButton(text, w, onClick)
