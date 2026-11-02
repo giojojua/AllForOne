@@ -366,8 +366,6 @@ function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
 	bar.absorbGlow:SetTexture(1, 1, 1, 1)
 	bar.absorbGlow:SetGradientAlpha("HORIZONTAL", 0.4, 0.9, 1, 0, 0.4, 0.9, 1, 0.7)
 	bar.absorbGlow:SetWidth(8)
-	bar.absorbGlow:SetPoint("TOPRIGHT", bar.absorbEdge, "TOPLEFT", 0, 0)
-	bar.absorbGlow:SetPoint("BOTTOMRIGHT", bar.absorbEdge, "BOTTOMLEFT", 0, 0)
 	bar.absorbGlow:Hide()
 	if hpText then
 		bar.absorbText = ns:CreateText(bar, math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
@@ -401,8 +399,10 @@ local function PaintAbsorb(bar, amount)
 	local width = math.min(w, w * amount / (max - (min or 0)))
 	local over = startX + width > w
 	if over then
-		-- bigger than the missing health: fill to the end, bright line at the bar's end
-		width = w - startX
+		-- bigger than the missing health (e.g. full health): it would have no room after the
+		-- health, so draw it over the end of the health bar instead, from the right, at its
+		-- true size - a 10 percent shield covers the last 10 percent of the bar
+		startX = w - width
 	end
 	if width >= 1 then
 		bar.absorb:ClearAllPoints()
@@ -415,10 +415,23 @@ local function PaintAbsorb(bar, amount)
 	else
 		bar.absorb:Hide()
 	end
+	-- the bright line marks where the shield ends; when it overlaps the health it marks where
+	-- it starts (the glow then faces into the shield)
+	local edgeX = over and startX or math.min(w - 1, startX + math.max(width, 1))
 	bar.absorbEdge:ClearAllPoints()
-	bar.absorbEdge:SetPoint("TOP", bar, "TOPLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
-	bar.absorbEdge:SetPoint("BOTTOM", bar, "BOTTOMLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
+	bar.absorbEdge:SetPoint("TOP", bar, "TOPLEFT", edgeX, 0)
+	bar.absorbEdge:SetPoint("BOTTOM", bar, "BOTTOMLEFT", edgeX, 0)
 	bar.absorbEdge:Show()
+	bar.absorbGlow:ClearAllPoints()
+	if over then
+		bar.absorbGlow:SetGradientAlpha("HORIZONTAL", 0.4, 0.9, 1, 0.7, 0.4, 0.9, 1, 0)
+		bar.absorbGlow:SetPoint("TOPLEFT", bar.absorbEdge, "TOPRIGHT", 0, 0)
+		bar.absorbGlow:SetPoint("BOTTOMLEFT", bar.absorbEdge, "BOTTOMRIGHT", 0, 0)
+	else
+		bar.absorbGlow:SetGradientAlpha("HORIZONTAL", 0.4, 0.9, 1, 0, 0.4, 0.9, 1, 0.7)
+		bar.absorbGlow:SetPoint("TOPRIGHT", bar.absorbEdge, "TOPLEFT", 0, 0)
+		bar.absorbGlow:SetPoint("BOTTOMRIGHT", bar.absorbEdge, "BOTTOMLEFT", 0, 0)
+	end
 	bar.absorbGlow:Show()
 	if bar.absorbText then
 		bar.absorbText:SetText(unknownSize and "+?" or ("+" .. ShortNum(amount)))
