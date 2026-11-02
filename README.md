@@ -23,7 +23,8 @@ A minimal, PvP-focused UI for World of Warcraft 3.3.5 (Wrath of the Lich King).
 - **Center:** target frame (cast bar, your debuffs, dispellable buffs, combo points), target of target, focus with cast bar, your cast bar. The middle of the screen stays clear for your character.
 - **Swing timer:** two thin bars under your cast bar (main hand, off hand) while you auto-attack; Auto Shot / wand Shoot for ranged. Handles dual-wield, parry haste, Heroic Strike/Cleave/Maul/Raptor Strike, Slam and haste changes.
 - **Next to your character:** proc alerts (Fingers of Frost, Hot Streak, Predator's Swiftness, …) and a loss-of-control alert when you are CC'd.
-- **Nameplates:** class colors, health and percentage inside the bar (`23.1k · 74%`), arena number, your debuffs, big CC from anyone, combo points; friendly plates are thin and only show dispellable CC. Totems (Tremor, Grounding, Earthbind…) get half-size plates with the totem's icon.
+- **Nameplates:** a framed health bar with a thin cast strip joined underneath (it fills for every enemy cast, with the spell's icon on the right), the class icon on the left, health and percentage inside the bar (`23.1k · 74%`), arena number, your debuffs, big CC from anyone, combo points. Friendly plates look the same but always green, with **light blue names** for your party/raid and friends; friendly pets are blue. NPCs and pets show their **real face** (Blizzard portrait) once you've targeted or moused over one (remembered until you reload). Totems (Tremor, Grounding, Earthbind…) get half-size plates with the totem's icon.
+- **Bars everywhere** share one look: a softened class / reaction color with a glossy top and darker bottom.
 - **Bottom:** 3 action bars in the middle (bar 1 at the bottom, bar 2 above, bar 3 on top) with the XP/rep bar under them; stance/forms/auras above their left corner and the pet bar above their right corner; 2 vertical bars bottom-right above bags and game menu (faded until hovered). Your Blizzard keybinds keep working. Button icons turn **red** when your target is out of range for that spell, **blue** when you don't have enough mana / rage / energy / runic power, and **dark** when it can't be used right now; this works for macros too (turn it off in `/afo` settings).
 - **Top:** arena bar with map, bracket, match timer and players alive (`3 v 3`); the gates countdown is shown inside that bar (`GATES 0:31`), also in battlegrounds; buffs (up to 16) and debuffs (up to 8) next to a square minimap (mouse wheel zooms) with small tracking, calendar, world map and addon buttons, clock and latency under it. The addon button (gear, with a count) opens a dropdown holding every other addon's minimap button, so they don't clutter the map; Esc or another click closes it.
 
@@ -52,7 +53,7 @@ Every arena you play is recorded from the combat log. When the match ends a smal
   - big defensive used above 70% health with little damage coming in
   - interrupts that missed (dodged, or the target wasn't casting)
   - interrupted on long casts you started while their interrupt was ready
-  - your crowd control wasted (immune from diminishing returns, reflected, grounded), landed at a quarter duration, broken early by your own team, or overlapping a teammate's
+  - your crowd control wasted (immune, reflected, grounded; the note names the spells), landed at a quarter duration, broken early by your own team, or overlapping a teammate's. Slows / snares and Deep Freeze on a stun-immune target never count
   - out of your healer's range for a large part of the fight (or, as a healer, teammates out of yours)
   - little of your damage on the marked kill target
 - **Deaths** — who died when, first death, and for your team a recap of the 10 seconds before: damage by spell and source, crowd control on them / your healer, cooldowns they used.
@@ -60,6 +61,8 @@ Every arena you play is recorded from the combat log. When the match ends a smal
 - **Enemies** — per enemy: died / died first, how fast they went down, trinketed (early?), defensives used or died with one unused, time crowd-controlled.
 - **Timeline** — gates, trinkets, defensives, interrupts, deaths.
 - **Trends (last 50)** — win rate, record against each enemy comp, average time crowd-controlled, interrupt success, and mistakes that repeat in your last 10 games.
+
+Players and classes in a saved match come from the battleground scoreboard at the end, so leftover enemies from the previous match never get mixed in.
 
 **Enemy history** — the analyzer remembers what each enemy player did in your stored matches (died first, wasted trinket, died with defensives up, used defensives early). Once you've faced someone twice, the kill target helper gives them a bonus and shows why (`died first 3/4`), and a note appears under known enemies (`faced 5× · died first 4×`). Newer games count more; since it's built from the stored 50 matches, it ages out with them.
 
@@ -76,6 +79,24 @@ Limits: only what the combat log shows within about 50 yards; no line of sight o
 - **Arenas after a battleground:** arenas always use the party rows, even if you come straight from a raid or the server puts the arena team in a raid group.
 - `/afo test bg` shows a sample battleground (raid grid, flag carriers, timers).
 - Flag, capture and countdown events come from the English system messages, so they need an English game client.
+
+### Combat meter (Details!-style)
+A damage / healing meter in the top-left corner, styled like Details!.
+- **Title bar:** the display (e.g. **DAMAGE DONE**) with the segment and fight time next to it, and gold buttons on the right: **segment** (CURRENT, OVERALL and your last 10 fights, named after the enemy that took the most damage), **display** (Damage Done, DPS, Damage Taken, Healing Done, HPS, Overhealing, Dispels, Interrupts, Deaths), **reset** and **lock**.
+- **Rows:** spec icon (class icon until the spec is known), `1. Name`, then `total (per second, percent)`. Hover a row for that player's top spells; click it for a breakdown window (amount, share, hits, crit %).
+- **Counts** you, your party / raid and your pets and summons (Mirror Image, Feral Spirit, Gargoyle, Treants count for their owner). Damage without overkill or friendly fire, healing without overheal; dispels list what was removed, interrupts what was stopped, deaths the killing blow.
+- **Window:** drag the title to move it, drag the bottom-right corner to resize, mouse wheel or the scrollbar to scroll; the padlock locks it (gold = locked). With no data only the title row shows. OVERALL is kept per character until you reset it.
+- Hover the title for what the meter has received (useful if it ever stays empty). Turn it off in `/afo` settings ("Combat meter").
+
+### Arena announcements
+In arena (with a party), short lines in party chat: `I'm stunned - Kidney Shot 6s`, `Shade is feared - Psychic Scream 8s`, `Polymorph on Vex 8s` (your CC, real duration incl. diminishing returns), `Trinket used` / `Shade used trinket`. Roots and anything under 2 seconds are skipped. Settings: ARENA → *Announce crowd control in party chat*.
+
+### Chat
+- Web addresses in chat (`https://…`, `www.…`, `discord.gg/…`, `warmane.com`) become blue `[links]`; click one and a box opens with it selected for Ctrl+C.
+- A dark background behind the chat (adjustable), a solid typing box with an edge in the channel's color, and the quest tracker above the chat (hidden in arena / battlegrounds).
+
+### Vehicles
+Vehicle bars (Isle of Conquest siege engines and glaive throwers, Wintergrasp…) and the **Leave** button show normally, in and out of combat; as a passenger the Leave button sits right of action bar 1.
 
 ### Settings
 Type `/afo` to open the settings window (UI size, class-colored bars, menu opacity, font, which parts of the UI are on, move mode, reset, test mode, procs). It's also under **Interface → AddOns → AllForOne**. `/afo help` lists every command.
@@ -130,6 +151,6 @@ Each character has its own list (a new character starts from your old shared lis
 
 ### Notes for 3.3.5
 - 3.3.5 has no nameplate API, so enemy debuffs on nameplates come from the combat log: exact when the enemy is your target/focus/arena unit, estimated otherwise.
-- Enemy spec is detected from the spells they cast.
+- Enemy spec is detected from deep talents only (31/41/51-point talents and their procs: Haunt, Metamorphosis, Chaos Bolt, Mutilate, Penance…), so hybrid talents like Soul Link never give a wrong spec; until one is seen, no spec is shown.
 - The arena gates countdown reads the English system messages.
 - Font: Barlow Condensed (SIL Open Font License, see `Media/OFL.txt`).
