@@ -696,8 +696,12 @@ local function Build()
 		acc = acc + e
 		if acc < 0.5 then return end
 		acc = 0
-		CheckEnd()
-		if dirty or (current.start and not current.stop) then M:Update() end
+		-- errors here would be silent (3.3.5 hides Lua errors by default): report them in chat
+		local ok, err = pcall(function()
+			CheckEnd()
+			if dirty or (current.start and not current.stop) then M:Update() end
+		end)
+		if not ok and err ~= M.lastErr then M.lastErr = err; ns:Report(err) end
 	end)
 	M:Update()
 end
