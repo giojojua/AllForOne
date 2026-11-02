@@ -232,6 +232,155 @@ function ns:CreateIconRow(parent, count, size, gap, grow)
 end
 
 ----------------------------------------------------------------------
+-- Absorb shields on health bars
+-- 3.3.5 has no absorb API: a shield buff's tooltip says how much it absorbs ("Absorbs 2230
+-- damage"), so we read that from the buff tooltips of the unit and draw it as a light layer
+-- right after the current health (a bright line at the bar's end if it's bigger than the
+-- missing health). Frames with room also show the number ("+2.2k").
+----------------------------------------------------------------------
+local ABSORB_IDS = {
+	17,     -- Power Word: Shield
+	47753,  -- Divine Aegis
+	58597,  -- Sacred Shield
+	11426,  -- Ice Barrier
+	1463,   -- Mana Shield
+	6229,   -- Shadow Ward
+	543,    -- Fire Ward
+	6143,   -- Frost Ward
+	64413,  -- Protection of Ancient Kings (Val'anyr)
+	28810,  -- Armor of Faith (priest T5 set)
+}
+local absorbNames
+local scan
+local function AbsorbNames()
+	if absorbNames then return absorbNames end
+	absorbNames = {}
+	for _, id in ipairs(ABSORB_IDS) do
+		local n = GetSpellInfo(id)
+		if n then absorbNames[n] = true end
+	end
+	return absorbNames
+end
+-- total "Absorbs N" on the unit's shield buffs (0 if none)
+local cache, cacheAt = {}, 0
+function ns:GetAbsorb(unit)
+	if not unit then return 0 end
+	if ns.testing and ns.fake and ns.fake[unit] then return ns.fake[unit].absorb or 0 end
+	local now = GetTime()
+	if now - cacheAt > 0.2 then wipe(cache); cacheAt = now end
+	if cache[unit] then return cache[unit] end
+	local total = 0
+	if UnitExists(unit) then
+		local names = AbsorbNames()
+		for i = 1, 40 do
+			local name = UnitBuff(unit, i)
+			if not name then break end
+			if names[name] then
+				if not scan then
+					scan = CreateFrame("GameTooltip", "AllForOneAbsorbScan", nil, "GameTooltipTemplate")
+					scan:SetOwner(WorldFrame, "ANCHOR_NONE")
+				end
+				scan:ClearLines()
+				scan:SetUnitBuff(unit, i)
+				for l = 2, scan:NumLines() do
+					local fs = _G["AllForOneAbsorbScanTextLeft" .. l]
+					local text = fs and fs:GetText()
+					local n = text and text:match("[Aa]bsorb%a*%s+(%d+)%s*[^%%%d]")
+						or (text and text:match("[Aa]bsorb%a*%s+(%d+)$"))
+					if n then total = total + tonumber(n) break end
+				end
+			end
+		end
+	end
+	cache[unit] = total
+	return total
+end
+
+local absorbBars = {}
+-- bar: a health StatusBar; getUnit(): the unit it shows. hpText / nameText (optional): the
+-- number goes just left of the health text, and the name makes room for it
+function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
+	bar.absorb = bar:CreateTexture(nil, "BORDER")
+	bar.absorb:SetTexture(1, 1, 1, 1)
+	bar.absorb:SetGradientAlpha("VERTICAL", 0.55, 0.85, 1, 0.35, 0.8, 0.95, 1, 0.6)
+	bar.absorb:Hide()
+	bar.absorbEdge = bar:CreateTexture(nil, "OVERLAY")
+	bar.absorbEdge:SetTexture(0.85, 0.97, 1, 0.95)
+	bar.absorbEdge:SetWidth(2)
+	bar.absorbEdge:Hide()
+	if hpText then
+		bar.absorbText = ns:CreateText(bar, math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
+		bar.absorbText:SetTextColor(0.7, 0.92, 1)
+		bar.absorbText:SetPoint("RIGHT", hpText, "LEFT", -5, 0)
+		bar.absorbText:Hide()
+		bar.absorbHp, bar.absorbName = hpText, nameText
+	end
+	absorbBars[#absorbBars + 1] = { bar = bar, getUnit = getUnit }
+end
+
+local function ShortNum(n)
+	if n >= 1e4 then return format("%.1fk", n / 1e3) end
+	return tostring(floor(n + 0.5))
+end
+local function PaintAbsorb(bar, amount)
+	local min, max = bar:GetMinMaxValues()
+	local cur = bar:GetValue() or 0
+	local w = bar:GetWidth() or 0
+	if not amount or amount <= 0 or not max or max <= 0 or w <= 0 then
+		bar.absorb:Hide(); bar.absorbEdge:Hide()
+		if bar.absorbText and bar.absorbText:IsShown() then
+			bar.absorbText:Hide()
+			if bar.absorbName then bar.absorbName:SetPoint("RIGHT", bar.absorbHp, "LEFT", -6, 0) end
+		end
+		return
+	end
+	local startX = w * (cur - (min or 0)) / (max - (min or 0))
+	local width = math.min(w, w * amount / (max - (min or 0)))
+	local over = startX + width > w
+	if over then
+		-- bigger than the missing health: fill to the end, bright line at the bar's end
+		width = w - startX
+	end
+	if width >= 1 then
+		bar.absorb:ClearAllPoints()
+		bar.absorb:SetPoint("TOPLEFT", bar, "TOPLEFT", startX, 0)
+		bar.absorb:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", startX, 0)
+		bar.absorb:SetWidth(width)
+		bar.absorb:Show()
+	else
+		bar.absorb:Hide()
+	end
+	bar.absorbEdge:ClearAllPoints()
+	bar.absorbEdge:SetPoint("TOP", bar, "TOPLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
+	bar.absorbEdge:SetPoint("BOTTOM", bar, "BOTTOMLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
+	bar.absorbEdge:Show()
+	if bar.absorbText then
+		bar.absorbText:SetText("+" .. ShortNum(amount))
+		if not bar.absorbText:IsShown() then
+			bar.absorbText:Show()
+			if bar.absorbName then bar.absorbName:SetPoint("RIGHT", bar.absorbText, "LEFT", -4, 0) end
+		end
+	end
+end
+
+local absorbTicker = CreateFrame("Frame")
+local absorbAcc = 0
+absorbTicker:SetScript("OnUpdate", function(_, e)
+	absorbAcc = absorbAcc + e
+	if absorbAcc < 0.25 then return end
+	absorbAcc = 0
+	for _, a in ipairs(absorbBars) do
+		if a.bar:IsVisible() then
+			local ok, err = pcall(function()
+				local u = a.getUnit()
+				PaintAbsorb(a.bar, u and ns:GetAbsorb(u) or 0)
+			end)
+			if not ok and err ~= a.lastErr then a.lastErr = err; ns:Report(err) end
+		end
+	end
+end)
+
+----------------------------------------------------------------------
 -- Cast bars
 ----------------------------------------------------------------------
 local castbars = {} -- unit -> { bar, ... }
