@@ -278,8 +278,9 @@ function ns:GetAbsorb(unit)
 			if names[name] then
 				if not scan then
 					scan = CreateFrame("GameTooltip", "AllForOneAbsorbScan", nil, "GameTooltipTemplate")
-					scan:SetOwner(WorldFrame, "ANCHOR_NONE")
 				end
+				-- a hidden reading tooltip needs its owner set again before every read
+				scan:SetOwner(WorldFrame, "ANCHOR_NONE")
 				scan:ClearLines()
 				scan:SetUnitBuff(unit, i)
 				for l = 2, scan:NumLines() do
@@ -300,7 +301,8 @@ local absorbBars = {}
 -- bar: a health StatusBar; getUnit(): the unit it shows. hpText / nameText (optional): the
 -- number goes just left of the health text, and the name makes room for it
 function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
-	bar.absorb = bar:CreateTexture(nil, "BORDER")
+	-- ARTWORK: above the bar's dark background (BORDER), next to the health fill
+	bar.absorb = bar:CreateTexture(nil, "ARTWORK")
 	bar.absorb:SetTexture(1, 1, 1, 1)
 	bar.absorb:SetGradientAlpha("VERTICAL", 0.55, 0.85, 1, 0.35, 0.8, 0.95, 1, 0.6)
 	bar.absorb:Hide()
