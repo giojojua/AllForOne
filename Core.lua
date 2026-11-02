@@ -124,6 +124,7 @@ ns.media = {
 	font = "Interface\\AddOns\\AllForOne\\Media\\BarlowCondensed-600.ttf",
 	fontBold = "Interface\\AddOns\\AllForOne\\Media\\BarlowCondensed-700.ttf",
 	fallback = "Fonts\\ARIALN.TTF",
+	absorb = "Interface\\AddOns\\AllForOne\\Media\\Absorb", -- 256x32 diagonal stripes
 }
 
 ns.colors = {

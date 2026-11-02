@@ -302,15 +302,22 @@ local absorbBars = {}
 -- number goes just left of the health text, and the name makes room for it
 function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
 	-- ARTWORK: above the bar's dark background (BORDER), next to the health fill
+	-- bright diagonal stripes (like the modern game's absorb texture) ...
 	bar.absorb = bar:CreateTexture(nil, "ARTWORK")
-	bar.absorb:SetTexture(1, 1, 1, 1)
-	-- bright, nearly solid ice-white so it stands out from any class color
-	bar.absorb:SetGradientAlpha("VERTICAL", 0.72, 0.92, 1, 0.85, 0.95, 1, 1, 0.95)
+	bar.absorb:SetTexture(media.absorb)
 	bar.absorb:Hide()
+	-- ... ending in a bright cyan line with a soft glow
 	bar.absorbEdge = bar:CreateTexture(nil, "OVERLAY")
-	bar.absorbEdge:SetTexture(1, 1, 1, 1)
+	bar.absorbEdge:SetTexture(0.55, 0.95, 1, 1)
 	bar.absorbEdge:SetWidth(2)
 	bar.absorbEdge:Hide()
+	bar.absorbGlow = bar:CreateTexture(nil, "OVERLAY")
+	bar.absorbGlow:SetTexture(1, 1, 1, 1)
+	bar.absorbGlow:SetGradientAlpha("HORIZONTAL", 0.4, 0.9, 1, 0, 0.4, 0.9, 1, 0.7)
+	bar.absorbGlow:SetWidth(8)
+	bar.absorbGlow:SetPoint("TOPRIGHT", bar.absorbEdge, "TOPLEFT", 0, 0)
+	bar.absorbGlow:SetPoint("BOTTOMRIGHT", bar.absorbEdge, "BOTTOMLEFT", 0, 0)
+	bar.absorbGlow:Hide()
 	if hpText then
 		bar.absorbText = ns:CreateText(bar, math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
 		bar.absorbText:SetTextColor(0.8, 0.96, 1)
@@ -330,7 +337,7 @@ local function PaintAbsorb(bar, amount)
 	local cur = bar:GetValue() or 0
 	local w = bar:GetWidth() or 0
 	if not amount or amount <= 0 or not max or max <= 0 or w <= 0 then
-		bar.absorb:Hide(); bar.absorbEdge:Hide()
+		bar.absorb:Hide(); bar.absorbEdge:Hide(); bar.absorbGlow:Hide()
 		if bar.absorbText and bar.absorbText:IsShown() then
 			bar.absorbText:Hide()
 			if bar.absorbName then bar.absorbName:SetPoint("RIGHT", bar.absorbHp, "LEFT", -6, 0) end
@@ -349,6 +356,8 @@ local function PaintAbsorb(bar, amount)
 		bar.absorb:SetPoint("TOPLEFT", bar, "TOPLEFT", startX, 0)
 		bar.absorb:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", startX, 0)
 		bar.absorb:SetWidth(width)
+		-- show a piece of the stripe image as wide as the shield (no stretching)
+		bar.absorb:SetTexCoord(0, math.min(1, width / 256), 0, 1)
 		bar.absorb:Show()
 	else
 		bar.absorb:Hide()
@@ -357,6 +366,7 @@ local function PaintAbsorb(bar, amount)
 	bar.absorbEdge:SetPoint("TOP", bar, "TOPLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
 	bar.absorbEdge:SetPoint("BOTTOM", bar, "BOTTOMLEFT", math.min(w - 1, startX + math.max(width, 1)), 0)
 	bar.absorbEdge:Show()
+	bar.absorbGlow:Show()
 	if bar.absorbText then
 		bar.absorbText:SetText("+" .. ShortNum(amount))
 		if not bar.absorbText:IsShown() then
