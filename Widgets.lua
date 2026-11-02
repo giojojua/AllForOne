@@ -304,15 +304,16 @@ function ns:AttachAbsorb(bar, getUnit, hpText, nameText)
 	-- ARTWORK: above the bar's dark background (BORDER), next to the health fill
 	bar.absorb = bar:CreateTexture(nil, "ARTWORK")
 	bar.absorb:SetTexture(1, 1, 1, 1)
-	bar.absorb:SetGradientAlpha("VERTICAL", 0.55, 0.85, 1, 0.35, 0.8, 0.95, 1, 0.6)
+	-- bright, nearly solid ice-white so it stands out from any class color
+	bar.absorb:SetGradientAlpha("VERTICAL", 0.72, 0.92, 1, 0.85, 0.95, 1, 1, 0.95)
 	bar.absorb:Hide()
 	bar.absorbEdge = bar:CreateTexture(nil, "OVERLAY")
-	bar.absorbEdge:SetTexture(0.85, 0.97, 1, 0.95)
+	bar.absorbEdge:SetTexture(1, 1, 1, 1)
 	bar.absorbEdge:SetWidth(2)
 	bar.absorbEdge:Hide()
 	if hpText then
 		bar.absorbText = ns:CreateText(bar, math.max(11, floor(select(2, hpText:GetFont()) or 13) - 2), true, "RIGHT")
-		bar.absorbText:SetTextColor(0.7, 0.92, 1)
+		bar.absorbText:SetTextColor(0.8, 0.96, 1)
 		bar.absorbText:SetPoint("RIGHT", hpText, "LEFT", -5, 0)
 		bar.absorbText:Hide()
 		bar.absorbHp, bar.absorbName = hpText, nameText
