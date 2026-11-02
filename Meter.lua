@@ -481,8 +481,8 @@ function M:Update()
 	local disp = DISPLAY[M.display] or DISPLAYS[1]
 	local seg = M:Shown()
 	local list, total, secs = Ranking(seg, disp)
-	win.title:SetText(disp.label)
-	win.seg:SetText(SegName(seg) .. ((seg.start or seg == overall) and ("  " .. Clock(secs)) or ""))
+	win.title:SetText(strupper(disp.label))
+	win.seg:SetText(strupper(SegName(seg)) .. ((seg.start or seg == overall) and ("  " .. Clock(secs)) or ""))
 	local n = VisibleRows()
 	M.scroll = math.max(0, math.min(M.scroll, #list - n))
 	-- scrollbar: only when there are more players than rows
@@ -570,18 +570,18 @@ end
 
 local function SegmentItems()
 	local items = {
-		{ label = "Current", value = "current", active = M.segment == "current", right = current.start and Clock(Duration(current)) or "" },
-		{ label = "Overall", value = "overall", active = M.segment == "overall", right = Clock(Duration(overall)) },
+		{ label = "CURRENT", value = "current", active = M.segment == "current", right = current.start and Clock(Duration(current)) or "" },
+		{ label = "OVERALL", value = "overall", active = M.segment == "overall", right = Clock(Duration(overall)) },
 	}
 	for i, seg in ipairs(history) do
-		items[#items + 1] = { label = "#" .. i .. "  " .. SegName(seg), value = i, active = M.segment == i, right = Clock(Duration(seg)) }
+		items[#items + 1] = { label = "#" .. i .. "  " .. strupper(SegName(seg)), value = i, active = M.segment == i, right = Clock(Duration(seg)) }
 	end
 	return items
 end
 
 local function DisplayItems()
 	local items = {}
-	for _, d in ipairs(DISPLAYS) do items[#items + 1] = { label = d.label, value = d.key, active = M.display == d.key } end
+	for _, d in ipairs(DISPLAYS) do items[#items + 1] = { label = strupper(d.label), value = d.key, active = M.display == d.key } end
 	return items
 end
 
