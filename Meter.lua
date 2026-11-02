@@ -541,8 +541,21 @@ local function Build()
 	frameLine:SetPoint("TOPLEFT", -1, 1)
 	frameLine:SetPoint("BOTTOMRIGHT", 1, -1)
 	if win.outline then win.outline:Hide() end
-	-- top-left corner of the screen
-	ns:Mover("meter", "DAMAGE METER", win, "TOPLEFT", "TOPLEFT", 24, -24)
+	-- position: top-left corner by default; once you drag it, wherever you left it
+	-- (its own lock button, not part of /afo unlock)
+	local function Place()
+		win:ClearAllPoints()
+		local pos = ns.db.meterPos
+		if pos then
+			win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
+		else
+			win:SetPoint("TOPLEFT", ns.root, "TOPLEFT", 24, -24)
+		end
+	end
+	Place()
+	M.Place = Place
+	win:SetMovable(true)
+	win:SetClampedToScreen(true)
 
 	-- title bar
 	local bar = CreateFrame("Frame", nil, win)
@@ -553,9 +566,33 @@ local function Build()
 	barBg:SetAllPoints(bar)
 	barBg:SetTexture(0, 0, 0, 0.3)
 	win.barBg = barBg
+	-- drag the title bar to move the window (while unlocked)
+	bar:EnableMouse(true)
+	bar:RegisterForDrag("LeftButton")
+	bar:SetScript("OnDragStart", function() if not ns.db.meterLocked then win:StartMoving() end end)
+	bar:SetScript("OnDragStop", function()
+		win:StopMovingOrSizing()
+		ns.db.meterPos = { x = floor(win:GetLeft() + 0.5), y = floor(win:GetTop() + 0.5) }
+		Place()
+	end)
 	-- toolbar on the right (gold icons), title on the left
 	local resetBtn = IconButton(bar, "Interface\\Icons\\Spell_Shadow_SacrificialShield", "Reset all data", function() M:Reset() end)
-	resetBtn:SetPoint("RIGHT", -6, 0)
+	-- lock: no dragging, no resizing
+	local lockBtn = IconButton(bar, "Interface\\LFGFrame\\UI-LFG-ICON-LOCK", "", function(self)
+		ns.db.meterLocked = not ns.db.meterLocked
+		M:ApplyLock()
+		if self:GetScript("OnEnter") then self:GetScript("OnEnter")(self) end
+	end)
+	lockBtn.tex:SetTexCoord(0, 1, 0, 1)
+	lockBtn:SetPoint("RIGHT", -6, 0)
+	lockBtn:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine(ns.db.meterLocked and "Locked - click to unlock" or "Unlocked - drag the title to move, the corner to resize. Click to lock")
+		GameTooltip:Show()
+	end)
+	lockBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	win.lockBtn = lockBtn
+	resetBtn:SetPoint("RIGHT", lockBtn, "LEFT", -5, 0)
 	local dispBtn = IconButton(bar, "Interface\\Icons\\Ability_DualWield", "Display: damage, healing, dispels...",
 		function(self) OpenMenu(self, DisplayItems(), function(v) M.display = v; M.scroll = 0; M:Update() end) end)
 	dispBtn:SetPoint("RIGHT", resetBtn, "LEFT", -5, 0)
@@ -634,13 +671,23 @@ local function Build()
 	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-	grip:SetScript("OnMouseDown", function() win:StartSizing("BOTTOMRIGHT") end)
+	grip:SetScript("OnMouseDown", function() if not ns.db.meterLocked then win:StartSizing("BOTTOMRIGHT") end end)
 	grip:SetScript("OnMouseUp", function()
 		win:StopMovingOrSizing()
 		ns.db.meterW, ns.db.meterH = floor(win:GetWidth() + 0.5), floor(win:GetHeight() + 0.5)
+		if win:GetLeft() then ns.db.meterPos = { x = floor(win:GetLeft() + 0.5), y = floor(win:GetTop() + 0.5) } end
+		Place()
 		M:Update()
 	end)
 	win:SetScript("OnSizeChanged", function() M:Update() end)
+	win.grip = grip
+	function M:ApplyLock()
+		local locked = ns.db.meterLocked
+		if locked then win.grip:Hide() else win.grip:Show() end
+		-- gold = locked, grey = unlocked
+		if locked then win.lockBtn.tex:SetVertexColor(1, 0.78, 0.3) else win.lockBtn.tex:SetVertexColor(0.55, 0.56, 0.59) end
+	end
+	M:ApplyLock()
 
 	-- refresh twice a second when something changed (and while a fight runs)
 	local acc = 0
