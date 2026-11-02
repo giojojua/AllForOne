@@ -13,12 +13,25 @@ local _, ns = ...
 local colors = ns.colors
 local GetTime, band = GetTime, bit.band
 
-local ROW_H, ROW_GAP, TITLE_H = 19, 1, 22
+local ROW_H, ROW_GAP, TITLE_H = 24, 1, 28
 local MAX_ROWS = 30
 local HISTORY = 10
 local MINE = (COMBATLOG_OBJECT_AFFILIATION_MINE or 1) + (COMBATLOG_OBJECT_AFFILIATION_PARTY or 2)
 	+ (COMBATLOG_OBJECT_AFFILIATION_RAID or 4)
 local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+-- spec icons (the talent tree icons) once we know someone's spec, class icon until then
+local SPEC_ICON = {
+	["WARRIOR:Arms"] = "Ability_Warrior_SavageBlow", ["WARRIOR:Fury"] = "Ability_Warrior_InnerRage", ["WARRIOR:Protection"] = "INV_Shield_06",
+	["PALADIN:Holy"] = "Spell_Holy_HolyBolt", ["PALADIN:Protection"] = "Spell_Holy_DevotionAura", ["PALADIN:Retribution"] = "Spell_Holy_AuraOfLight",
+	["HUNTER:Beast Mastery"] = "Ability_Hunter_BeastTaming", ["HUNTER:Marksmanship"] = "Ability_Marksmanship", ["HUNTER:Survival"] = "Ability_Hunter_SwiftStrike",
+	["ROGUE:Assassination"] = "Ability_Rogue_Eviscerate", ["ROGUE:Combat"] = "Ability_BackStab", ["ROGUE:Subtlety"] = "Ability_Stealth",
+	["PRIEST:Discipline"] = "Spell_Holy_WordFortitude", ["PRIEST:Holy"] = "Spell_Holy_GuardianSpirit", ["PRIEST:Shadow"] = "Spell_Shadow_ShadowWordPain",
+	["DRUID:Balance"] = "Spell_Nature_StarFall", ["DRUID:Feral"] = "Ability_Racial_BearForm", ["DRUID:Restoration"] = "Spell_Nature_HealingTouch",
+	["SHAMAN:Elemental"] = "Spell_Nature_Lightning", ["SHAMAN:Enhancement"] = "Spell_Nature_LightningShield", ["SHAMAN:Restoration"] = "Spell_Nature_MagicImmunity",
+	["MAGE:Arcane"] = "Spell_Holy_MagicalSentry", ["MAGE:Fire"] = "Spell_Fire_FireBolt02", ["MAGE:Frost"] = "Spell_Frost_FrostBolt02",
+	["WARLOCK:Affliction"] = "Spell_Shadow_DeathCoil", ["WARLOCK:Demonology"] = "Spell_Shadow_Metamorphosis", ["WARLOCK:Destruction"] = "Spell_Shadow_RainOfFire",
+	["DEATHKNIGHT:Blood"] = "Spell_Deathknight_BloodPresence", ["DEATHKNIGHT:Frost"] = "Spell_Deathknight_FrostPresence", ["DEATHKNIGHT:Unholy"] = "Spell_Deathknight_UnholyPresence",
+}
 
 -- what can be shown: stat = the counter, ps = per-second display, count = plain numbers
 local DISPLAYS = {
@@ -85,7 +98,7 @@ local function Entry(seg, guid)
 	local p = seg.players[guid]
 	if not p then
 		local info = group[guid]
-		p = { name = info and info.name or "?", class = info and info.class, spells = {} }
+		p = { name = info and info.name or "?", class = info and info.class, guid = guid, spells = {} }
 		seg.players[guid] = p
 	end
 	for _, s in ipairs(STATS) do
@@ -425,8 +438,8 @@ function M:Update()
 	local disp = DISPLAY[M.display] or DISPLAYS[1]
 	local seg = M:Shown()
 	local list, total, secs = Ranking(seg, disp)
-	win.title:SetText(disp.label .. " |cff8b8f96- " .. SegName(seg) .. "|r")
-	win.clock:SetText((seg.start or seg == overall) and Clock(secs) or "")
+	win.title:SetText(disp.label)
+	win.seg:SetText(SegName(seg) .. ((seg.start or seg == overall) and ("  " .. Clock(secs)) or ""))
 	local n = VisibleRows()
 	M.scroll = math.max(0, math.min(M.scroll, #list - n))
 	local top = list[1] and list[1][disp.stat] or 1
@@ -438,9 +451,15 @@ function M:Update()
 			row:SetMinMaxValues(0, top)
 			row:SetValue(p[disp.stat])
 			local r, g, b = ns:ClassColor(p.class)
-			row:SetStatusBarColor(r * 0.78, g * 0.78, b * 0.78)
+			row:SetStatusBarColor(r * 0.72, g * 0.72, b * 0.72)
+			row.edge:SetVertexColor(r, g, b, 0.9)
+			local spec = p.class and p.guid and ns.specs[p.guid]
+			local specIcon = spec and SPEC_ICON[p.class .. ":" .. spec]
 			local coords = p.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[p.class]
-			if coords then
+			if specIcon then
+				row.icon:SetTexture("Interface\\Icons\\" .. specIcon)
+				row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			elseif coords then
 				row.icon:SetTexture(CLASS_TEX)
 				row.icon:SetTexCoord(coords[1] + 0.015, coords[2] - 0.015, coords[3] + 0.015, coords[4] - 0.015)
 			else
@@ -459,12 +478,14 @@ end
 
 local function IconButton(parent, texture, tip, onClick)
 	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(16, 16)
+	b:SetSize(18, 18)
 	b.tex = b:CreateTexture(nil, "ARTWORK")
 	b.tex:SetAllPoints(b)
 	b.tex:SetTexture(texture)
 	b.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	b.tex:SetVertexColor(0.8, 0.8, 0.8)
+	if b.tex.SetDesaturated then b.tex:SetDesaturated(true) end
+	b.tex:SetVertexColor(1, 0.78, 0.3) -- gold toolbar icons
 	b:SetScript("OnClick", onClick)
 	b:SetScript("OnEnter", function(self)
 		self.tex:SetVertexColor(1, 1, 1)
@@ -472,7 +493,7 @@ local function IconButton(parent, texture, tip, onClick)
 		GameTooltip:AddLine(tip)
 		GameTooltip:Show()
 	end)
-	b:SetScript("OnLeave", function(self) self.tex:SetVertexColor(0.8, 0.8, 0.8); GameTooltip:Hide() end)
+	b:SetScript("OnLeave", function(self) self.tex:SetVertexColor(1, 0.78, 0.3); GameTooltip:Hide() end)
 	return b
 end
 
@@ -505,9 +526,15 @@ local function Build()
 	ns.db.meterAll = nil -- older version's data
 
 	win = CreateFrame("Frame", "AllForOneMeter", ns.root)
-	win:SetSize(ns.db.meterW or 260, ns.db.meterH or (TITLE_H + 8 * (ROW_H + ROW_GAP) + 2))
+	win:SetSize(ns.db.meterW or 320, ns.db.meterH or (TITLE_H + 8 * (ROW_H + ROW_GAP) + 3))
 	ns:Skin(win)
-	win.fill:SetTexture(0.03, 0.035, 0.043, 0.82)
+	win.fill:SetTexture(0.035, 0.04, 0.045, 0.88)
+	-- thin light frame around the window, like Details!
+	local frameLine = win:CreateTexture(nil, "BACKGROUND", nil, -1)
+	frameLine:SetTexture(0.32, 0.33, 0.36, 1)
+	frameLine:SetPoint("TOPLEFT", -1, 1)
+	frameLine:SetPoint("BOTTOMRIGHT", 1, -1)
+	if win.outline then win.outline:Hide() end
 	-- top-left corner of the screen
 	ns:Mover("meter", "DAMAGE METER", win, "TOPLEFT", "TOPLEFT", 24, -24)
 
@@ -518,39 +545,51 @@ local function Build()
 	bar:SetHeight(TITLE_H)
 	local barBg = bar:CreateTexture(nil, "BACKGROUND")
 	barBg:SetAllPoints(bar)
-	barBg:SetTexture(0, 0, 0, 0.55)
-	local segBtn = IconButton(bar, "Interface\\Icons\\INV_Misc_PocketWatch_01", "Segment: current, overall, past fights",
-		function(self) OpenMenu(self, SegmentItems(), function(v) M.segment = v; M.scroll = 0; M:Update() end) end)
-	segBtn:SetPoint("LEFT", 4, 0)
+	barBg:SetTexture(0, 0, 0, 0.3)
+	-- toolbar on the right (gold icons), title on the left
+	local resetBtn = IconButton(bar, "Interface\\Icons\\Spell_Shadow_SacrificialShield", "Reset all data", function() M:Reset() end)
+	resetBtn:SetPoint("RIGHT", -6, 0)
 	local dispBtn = IconButton(bar, "Interface\\Icons\\Ability_DualWield", "Display: damage, healing, dispels...",
 		function(self) OpenMenu(self, DisplayItems(), function(v) M.display = v; M.scroll = 0; M:Update() end) end)
-	dispBtn:SetPoint("LEFT", segBtn, "RIGHT", 4, 0)
-	local resetBtn = IconButton(bar, "Interface\\Icons\\Spell_Shadow_SacrificialShield", "Reset all data", function() M:Reset() end)
-	resetBtn:SetPoint("LEFT", dispBtn, "RIGHT", 4, 0)
-	win.title = ns:CreateText(bar, 12, true, "LEFT")
-	win.title:SetPoint("LEFT", resetBtn, "RIGHT", 7, 0)
-	win.clock = ns:CreateText(bar, 11, true, "RIGHT")
-	win.clock:SetPoint("RIGHT", -6, 0)
-	win.clock:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
-	win.title:SetPoint("RIGHT", win.clock, "LEFT", -4, 0)
+	dispBtn:SetPoint("RIGHT", resetBtn, "LEFT", -5, 0)
+	local segBtn = IconButton(bar, "Interface\\Icons\\INV_Misc_PocketWatch_01", "Segment: current, overall, past fights",
+		function(self) OpenMenu(self, SegmentItems(), function(v) M.segment = v; M.scroll = 0; M:Update() end) end)
+	segBtn:SetPoint("RIGHT", dispBtn, "LEFT", -5, 0)
+	win.title = ns:CreateText(bar, 16, true, "LEFT")
+	win.title:SetPoint("LEFT", 8, 0)
+	win.title:SetShadowColor(0, 0, 0, 1)
+	win.title:SetShadowOffset(1, -1)
+	win.seg = ns:CreateText(bar, 11, true, "LEFT")
+	win.seg:SetPoint("LEFT", win.title, "RIGHT", 8, -1)
+	win.seg:SetPoint("RIGHT", segBtn, "LEFT", -6, 0)
+	win.seg:SetTextColor(colors.muted[1], colors.muted[2], colors.muted[3])
+	win.clock = win.seg
 
 	-- rows
 	win.rows = {}
 	for i = 1, MAX_ROWS do
 		local row = ns:CreateBar(win, 10, ROW_H)
-		row:SetPoint("TOPLEFT", 1, -TITLE_H - 1 - (i - 1) * (ROW_H + ROW_GAP))
-		row:SetPoint("RIGHT", win, "RIGHT", -1, 0)
+		-- the bar starts right of the spec / class icon
+		row:SetPoint("TOPLEFT", 2 + ROW_H + 1, -TITLE_H - 1 - (i - 1) * (ROW_H + ROW_GAP))
+		row:SetPoint("RIGHT", win, "RIGHT", -2, 0)
+		if row.outline then row.outline:Hide() end
+		-- a thin bright line along the top of the bar in the class color
+		row.edge = row:CreateTexture(nil, "OVERLAY")
+		row.edge:SetTexture(1, 1, 1, 1)
+		row.edge:SetPoint("TOPLEFT", row:GetStatusBarTexture(), "TOPLEFT", 0, 0)
+		row.edge:SetPoint("TOPRIGHT", row:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+		row.edge:SetHeight(1)
 		-- text on its own layer above the bar's shine
 		local tl = CreateFrame("Frame", nil, row)
 		tl:SetAllPoints(row)
 		tl:SetFrameLevel(row:GetFrameLevel() + 3)
 		row.icon = tl:CreateTexture(nil, "OVERLAY")
 		row.icon:SetSize(ROW_H, ROW_H)
-		row.icon:SetPoint("LEFT", 0, 0)
-		row.value = ns:CreateText(tl, 12, true, "RIGHT")
-		row.value:SetPoint("RIGHT", -4, 0)
-		row.name = ns:CreateText(tl, 12, true, "LEFT")
-		row.name:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+		row.icon:SetPoint("RIGHT", row, "LEFT", -1, 0)
+		row.value = ns:CreateText(tl, 15, true, "RIGHT")
+		row.value:SetPoint("RIGHT", -5, 0)
+		row.name = ns:CreateText(tl, 15, true, "LEFT")
+		row.name:SetPoint("LEFT", 6, 0)
 		row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
 		for _, fs in ipairs({ row.name, row.value }) do
 			fs:SetShadowColor(0, 0, 0, 1)
