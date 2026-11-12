@@ -242,6 +242,15 @@ function Row:UpdateHealth()
 	end
 end
 
+-- mana: "8.2k · 64%" (yours) / "64%" (others); rage, energy, runic power: the number
+local function PowerLabel(cur, max, ptype, full)
+	cur = cur or 0
+	if (ptype or 0) ~= 0 then return tostring(floor(cur)) end
+	local pct = floor(cur / max * 100 + 0.5) .. "%"
+	if full then return Short(cur) .. " · " .. pct end
+	return pct
+end
+
 function Row:UpdatePower()
 	local cur, max, ptype = U.Power(self.unit)
 	if not max or max == 0 then max = 1 end
@@ -249,6 +258,7 @@ function Row:UpdatePower()
 	self.power:SetStatusBarColor(c[1], c[2], c[3])
 	self.power:SetMinMaxValues(0, max)
 	self.power:SetValue(cur or 0)
+	if self.pwText then self.pwText:SetText(PowerLabel(cur, max, ptype, self.unit == "player")) end
 end
 
 local function PaintClass(self)
@@ -451,8 +461,9 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 		f.num:SetText(unit:match("%d"))
 	end
 
-	f.health = ns:CreateBar(f, 204, 32)
-	f:Place(f.health, 44, 0, 204, 32)
+	-- health 26 + power 12 (tall enough for its own numbers) = the 40px row
+	f.health = ns:CreateBar(f, 204, 26)
+	f:Place(f.health, 44, 0, 204, 26)
 	f.nameText = ns:CreateText(ns:TextLayer(f.health), 16, true, "LEFT")
 	f.hpText = ns:CreateText(ns:TextLayer(f.health), 16, true, "RIGHT")
 	f.hpText:SetPoint("RIGHT", -8, 0)
@@ -461,8 +472,10 @@ local function CreateRow(unit, petUnit, enemy, index, holder)
 	-- absorb shields (Power Word: Shield, Ice Barrier...) after the health, "+2.2k" by the %
 	ns:AttachAbsorb(f.health, function() return f.unit end, f.hpText, f.nameText)
 
-	f.power = ns:CreateBar(f, 204, 6)
-	f:Place(f.power, 44, 34, 204, 6)
+	f.power = ns:CreateBar(f, 204, 12)
+	f:Place(f.power, 44, 28, 204, 12)
+	f.pwText = ns:CreateText(ns:TextLayer(f.power), 11, true, "RIGHT")
+	f.pwText:SetPoint("RIGHT", -8, 0)
 
 	f.trinket = ns:CreateIcon(f, 40, 13)
 	f:Place(f.trinket, 252, 0, 40, 40)
@@ -597,6 +610,7 @@ function Target:UpdatePower()
 	self.power:SetStatusBarColor(c[1], c[2], c[3])
 	self.power:SetMinMaxValues(0, max)
 	self.power:SetValue(cur or 0)
+	if self.pwText then self.pwText:SetText(max > 1 and PowerLabel(cur, max, ptype, true) or "") end
 end
 
 -- Combo points show for Rogues and Druids (or whenever you have points)
@@ -729,8 +743,10 @@ local function CreateTarget(holder)
 	f.nameText:SetPoint("RIGHT", f.hpText, "LEFT", -6, 0)
 	ns:AttachAbsorb(f.health, function() return "target" end, f.hpText, f.nameText)
 
-	f.power = ns:CreateBar(f, 244, 8)
+	f.power = ns:CreateBar(f, 244, 14)
 	f.power:SetPoint("TOPLEFT", f.health, "BOTTOMLEFT", 0, -2)
+	f.pwText = ns:CreateText(ns:TextLayer(f.power), 12, true, "RIGHT")
+	f.pwText:SetPoint("RIGHT", -8, 0)
 
 	-- class icon on the left, as tall as health + power
 	f.classIcon = ns:CreateIcon(f, 46)
