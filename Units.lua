@@ -685,7 +685,7 @@ function Target:UpdateAuras()
 		local a = buffs[i]
 		icon.auraIndex, icon.auraFilter = a and a.index, "HELPFUL"
 		if a then
-			icon:Set(a.icon, a.count, a.dur, a.expires)
+			icon:Set(a.icon, a.count) -- no timer on target buffs (still sorted short ones first)
 			if a.purge then
 				icon:SetBorder(colors.dispel.Magic[1], colors.dispel.Magic[2], colors.dispel.Magic[3])
 			else
