@@ -97,6 +97,7 @@ ns.defaults = {
 	announceKill = true,    -- announce kill target changes in party chat
 	announceCC = true,      -- arena: crowd control + trinkets in party chat
 	meter = true,           -- damage / healing meter
+	plateOverlap = false,   -- nameplates may overlap (off = the game spreads them apart)
 	analyzerOn = true,      -- record arena matches (last 50)
 	analyzerPopup = true,   -- small report popup after each arena
 	usableColors = true,    -- tint action buttons: red out of range, blue no power

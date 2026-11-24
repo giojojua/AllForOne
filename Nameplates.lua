@@ -738,9 +738,16 @@ scanner:SetScript("OnUpdate", function(_, elapsed)
 end)
 scanner:Hide()
 
+-- Overlapping nameplates: 3.3.5's "spreadnameplates" CVar (1 = push plates apart so they never
+-- overlap, 0 = every plate stays right above its unit, even if they stack)
+function ns:ApplyPlateOverlap()
+	pcall(SetCVar, "spreadnameplates", ns.db.plateOverlap and "0" or "1")
+end
+
 ns:Listen("LOGIN", function()
 	if not ns.db.nameplates then return end
 	SetCVar("ShowClassColorInNameplate", "1")
+	ns:ApplyPlateOverlap()
 	-- enemy totems get (small) plates too
 	pcall(SetCVar, "nameplateShowEnemyTotems", "1")
 	scanner:Show()

@@ -160,6 +160,9 @@ local function Build()
 	Add(Check(win, "Macro names on action buttons", nil,
 		function() return ns.db.macroNames ~= false end,
 		function(v) ns.db.macroNames = v; ns:Send("REFRESH_ALL") end))
+	Add(Check(win, "Overlapping nameplates", "plates stay above their unit, even when they stack",
+		function() return ns.db.plateOverlap == true end,
+		function(v) ns.db.plateOverlap = v; if ns.ApplyPlateOverlap then ns:ApplyPlateOverlap() end end))
 	Add(Check(win, "Hide red error messages", "yellow info still shows",
 		function() return ns.db.hideErrors == true end,
 		function(v) ns.db.hideErrors = v; ns:ApplyErrorFilter() end))
